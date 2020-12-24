@@ -107,3 +107,6 @@ object Dao {
 
 ## References
 - java driver https://docs.datastax.com/en/developer/java-driver/4.9/
+
+## License
+Cassandra4io is released under the [Apache License 2.0](https://opensource.org/licenses/Apache-2.0).
