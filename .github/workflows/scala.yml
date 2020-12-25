@@ -8,14 +8,28 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
     - name: Set up JDK
       uses: actions/setup-java@v1
       with:
         java-version: 11
-    - name: Run tests
+    - name: Run unit tests
       run: sbt test
+  it tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up JDK
+      uses: actions/setup-java@v1
+      with:
+        java-version: 11
+    - uses: docker-practice/actions-setup-docker@master
+      with:
+        docker_channel: stable
+        docker_version: 20.10
+    - name: Run unit tests
+      run: sbt test
+    - name: Run it tests
+      run: sbt it:test
