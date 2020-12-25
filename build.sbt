@@ -23,7 +23,12 @@ lazy val root = (project in file("."))
       "com.disneystreaming" %% "weaver-framework"               % "0.5.1"  % "it,test",
       "org.testcontainers"   % "testcontainers"                 % "1.15.1" % "it",
       "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.38.6" % "it"
-    )
+    ),
+    publishTo := Some("Bintray" at "https://dl.bintray.com/ringcentral/maven"),
+    credentials += (for {
+        username <- Option(System.getenv().get("BINTRAY_USERNAME"))
+        password <- Option(System.getenv().get("BINTRAY_PASSWORD"))
+      } yield Credentials("Bintray", "dl.bintray.com", username, password))
   )
 
 Compile / compile / scalacOptions ++= Seq(
