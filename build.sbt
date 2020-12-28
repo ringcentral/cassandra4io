@@ -24,11 +24,9 @@ lazy val root = (project in file("."))
       "org.testcontainers"   % "testcontainers"                 % "1.15.1" % "it",
       "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.38.6" % "it"
     ),
-    publishTo := Some("Bintray" at "https://dl.bintray.com/ringcentral/maven"),
-    credentials += (for {
-        username <- Option(System.getenv().get("BINTRAY_USERNAME"))
-        password <- Option(System.getenv().get("BINTRAY_PASSWORD"))
-      } yield Credentials("Bintray", "dl.bintray.com", username, password))
+    bintrayOrganization := Some("ringcentral"),
+    bintrayRepository := "cassandra4io",
+    licenses += ("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0"))
   )
 
 Compile / compile / scalacOptions ++= Seq(
