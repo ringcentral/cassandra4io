@@ -15,7 +15,15 @@ optimizations, less allocations, metrics improvements, and fully compatible with
 
 
 ## How to use
+Cassandra4io is currently available only for Scala 2.13.
 
+### Add a dependency to your project
+```scala
+resolvers += Resolver.bintrayRepo("ringcentral", "cassandra4io")
+libraryDependencies += ("com.ringcentral" %% "cassandra4io" % "0.1.2")
+```
+
+### Create a connection to Cassandra
 ```scala
 import com.ringcentral.cassandra4io.CassandraSession
 
@@ -34,7 +42,7 @@ def makeSession[F[_]: Async: ContextShift]: Resource[F, CassandraSession[F]] =
   CassandraSession.connect(builder)
 ```
 
-## Typed cql
+### Write some requests
 
 package `com.ringcentral.cassandra4io.cql` introduces typed way to deal with cql queries
 
