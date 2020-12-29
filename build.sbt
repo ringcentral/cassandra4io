@@ -1,3 +1,5 @@
+import ReleaseTransformations._
+
 name := "cassandra4io"
 
 inThisBuild(
@@ -26,7 +28,19 @@ lazy val root = (project in file("."))
     ),
     bintrayOrganization := Some("ringcentral"),
     bintrayRepository := "cassandra4io",
-    licenses += ("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0"))
+    licenses += ("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0")),
+    releaseProcess := Seq[ReleaseStep]( // default but with no publish step
+      checkSnapshotDependencies,
+      inquireVersions,
+      runClean,
+      runTest,
+      setReleaseVersion,
+      commitReleaseVersion,
+      tagRelease,
+      setNextVersion,
+      commitNextVersion,
+      pushChanges
+    )
   )
 
 Compile / compile / scalacOptions ++= Seq(
