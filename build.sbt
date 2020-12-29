@@ -23,7 +23,10 @@ lazy val root = (project in file("."))
       "com.disneystreaming" %% "weaver-framework"               % "0.5.1"  % "it,test",
       "org.testcontainers"   % "testcontainers"                 % "1.15.1" % "it",
       "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.38.6" % "it"
-    )
+    ),
+    bintrayOrganization := Some("ringcentral"),
+    bintrayRepository := "cassandra4io",
+    licenses += ("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0"))
   )
 
 Compile / compile / scalacOptions ++= Seq(
