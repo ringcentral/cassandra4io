@@ -15,4 +15,7 @@ jobs:
         with:
           java-version: 11
       - name: Publish release
+        env:
+          BINTRAY_USER: ${{ secrets.BintrayUser }}
+          BINTRAY_PAS: ${{ secrets.BintrayPass }}
         run: sbt publish
