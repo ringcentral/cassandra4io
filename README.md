@@ -1,5 +1,7 @@
 # Cassandra 4 io
 
+![CI](https://github.com/ringcentral/cassandra4io/workflows/CI/badge.svg?branch=main)
+
 This is lightweight cats-effect and fs2 IO wrapper for latest datastax 4.x driver.
 
 Why 4.x?
