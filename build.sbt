@@ -25,7 +25,13 @@ lazy val root = (project in file("."))
       "com.disneystreaming" %% "weaver-framework"               % "0.5.1"  % "it,test",
       "org.testcontainers"   % "testcontainers"                 % "1.15.1" % "it",
       "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.38.6" % "it"
-    ),
+    ) ++ (scalaBinaryVersion.value match {
+      case v if v.startsWith("2.13") =>
+        Seq.empty
+      case v if v.startsWith("2.12") =>
+        Seq("org.scala-lang.modules" %% "scala-collection-compat" % "2.3.2")
+      case other                     => sys.error(s"Unsupported scala version: $other")
+    }),
     bintrayOrganization := Some("ringcentral"),
     bintrayRepository := "cassandra4io",
     licenses += ("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0")),
@@ -66,9 +72,15 @@ Compile / compile / scalacOptions ++= Seq(
         "-Wconf:any:error"
       )
     case v if v.startsWith("2.12") =>
-      Nil
-    case v if v.startsWith("2.11") =>
-      List("-target:jvm-1.8")
+      List(
+        "-language:higherKinds",
+        // "-Ywarn-unused",
+        "-Yrangepos",
+        "-explaintypes",
+        "-language:higherKinds",
+        "-language:implicitConversions",
+        "-Xfatal-warnings",
+      )
     case v if v.startsWith("0.")   =>
       Nil
     case other                     => sys.error(s"Unsupported scala version: $other")

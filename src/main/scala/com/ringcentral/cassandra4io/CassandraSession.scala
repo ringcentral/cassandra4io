@@ -9,8 +9,7 @@ import com.ringcentral.cassandra4io.utils.JavaConcurrentToCats.fromJavaAsync
 import fs2.{ Chunk, Pull, Stream }
 import simulacrum.typeclass
 
-import scala.jdk.CollectionConverters.IterableHasAsScala
-import scala.jdk.OptionConverters._
+import scala.jdk.CollectionConverters._
 
 @typeclass
 trait CassandraSession[F[_]] {
@@ -32,7 +31,7 @@ object CassandraSession {
     underlying: CqlSession
   ) extends CassandraSession[F] {
 
-    def metrics: Option[Metrics] = underlying.getMetrics.toScala
+    def metrics: Option[Metrics] = underlying.getMetrics.asScala
 
     override def prepare(stmt: String): F[PreparedStatement] =
       fromJavaAsync(underlying.prepareAsync(stmt))
