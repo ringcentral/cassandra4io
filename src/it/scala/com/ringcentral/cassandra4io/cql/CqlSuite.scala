@@ -3,32 +3,26 @@ package com.ringcentral.cassandra4io.cql
 import com.datastax.oss.driver.api.core.ConsistencyLevel
 import com.ringcentral.cassandra4io.CassandraTestsSharedInstances
 import fs2.Stream
-import shapeless.Generic
 import weaver._
 
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
-import shapeless.ops.hlist.Tupler._
-import shapeless.syntax.std.tuple._
+import java.time.Duration
 
 trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
 
   case class Data(id: Long, data: String)
 
-//  test("interpolated select template should return data from migration") { session =>
-//    for {
-//      prepared <- cqlt"select data FROM cassandra4io.test_data WHERE id in ${Put[List[Long]]}"
-//                    .as[String]
-//                    .config(_.setTimeout(1.second.toJava))
-//                    .prepare(session)
-//      query     = prepared(List[Long](1, 2, 3))
-//      results  <- query.select.compile.toList
-//    } yield expect(results == Seq("one", "two", "three"))
-//  }
+  test("interpolated select template should return data from migration") { session =>
+    for {
+      prepared <- cqlt"select data FROM cassandra4io.test_data WHERE id in ${Put[List[Long]]}"
+                    .as[String]
+                    .config(_.setTimeout(Duration.ofSeconds(1)))
+                    .prepare(session)
+      query     = prepared(List[Long](1, 2, 3))
+      results  <- query.select.compile.toList
+    } yield expect(results == Seq("one", "two", "three"))
+  }
 
   test("interpolated select template should return tuples from migration") { session =>
-    implicit val test: Generic[(Long, String)] = implicitly[Generic[(Long,String)]]
-    implicit val test2: Reads[(Long,String)] = implicitly[Reads[(Long,String)]]
     for {
       prepared <- cqlt"select id, data FROM cassandra4io.test_data WHERE id in ${Put[List[Long]]}"
                     .as[(Long, String)]
