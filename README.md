@@ -17,7 +17,7 @@ optimizations, less allocations, metrics improvements, and fully compatible with
 
 
 ## How to use
-Cassandra4io is currently available only for Scala 2.13.
+Cassandra4io is currently available for Scala 2.13 and 2.12.
 
 ### Add a dependency to your project
 ```scala
