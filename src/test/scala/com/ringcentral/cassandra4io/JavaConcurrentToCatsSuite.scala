@@ -30,7 +30,7 @@ object JavaConcurrentToCatsSuite extends SimpleIOSuite {
     CompletableFuture.supplyAsync(() => throw ex)
 
   // doesn't cath by NonFatal
-  final case class FatalFailure(msg: String) extends ControlThrowable(s"fatal failure: $msg")
+  final case class FatalFailure(msg: String) extends ControlThrowable()
 
   simpleTest("be lazy on CompletionStage") {
     var evaluated                     = false

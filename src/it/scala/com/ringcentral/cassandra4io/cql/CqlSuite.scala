@@ -5,8 +5,7 @@ import com.ringcentral.cassandra4io.CassandraTestsSharedInstances
 import fs2.Stream
 import weaver._
 
-import scala.concurrent.duration._
-import scala.jdk.DurationConverters._
+import java.time.Duration
 
 trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
 
@@ -16,7 +15,7 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
     for {
       prepared <- cqlt"select data FROM cassandra4io.test_data WHERE id in ${Put[List[Long]]}"
                     .as[String]
-                    .config(_.setTimeout(1.second.toJava))
+                    .config(_.setTimeout(Duration.ofSeconds(1)))
                     .prepare(session)
       query     = prepared(List[Long](1, 2, 3))
       results  <- query.select.compile.toList
