@@ -11,6 +11,7 @@ import com.datastax.oss.driver.api.core.cql.{ BatchStatementBuilder, BatchType, 
 import fs2.Stream
 import shapeless._
 
+import java.util.UUID
 import scala.annotation.implicitNotFound
 import scala.jdk.CollectionConverters._
 import scala.reflect.ClassTag
@@ -92,7 +93,7 @@ package object cql {
       def binder: Binder[Repr]
     }
 
-    private object BindableBuilder   {
+    private object BindableBuilder {
       type Aux[P, Repr0] = BindableBuilder[P] { type Repr = Repr0 }
       def apply[P](implicit builder: BindableBuilder[P]): BindableBuilder.Aux[P, builder.Repr] = builder
       implicit def hNilBindableBuilder: BindableBuilder.Aux[HNil, HNil]                        = new BindableBuilder[HNil] {
@@ -127,7 +128,7 @@ package object cql {
 
   Construct it if needed, please refer to Binder source code for guidance
 """)
-  sealed trait Binder[T] {
+  trait Binder[T] {
     def bind(statement: BoundStatement, index: Int, value: T): (BoundStatement, Int)
   }
 
@@ -180,6 +181,11 @@ package object cql {
         (statement.setBoolean(index, value), index + 1)
     }
 
+    implicit val uuidBinder: Binder[UUID] = new Binder[UUID] {
+      override def bind(statement: BoundStatement, index: Int, value: UUID): (BoundStatement, Int) =
+        (statement.setUuid(index, value), index + 1)
+    }
+
     implicit def optionBinder[T: Binder]: Binder[Option[T]] = new Binder[Option[T]] {
       override def bind(statement: BoundStatement, index: Int, value: Option[T]): (BoundStatement, Int) = value match {
         case Some(x) => Binder[T].bind(statement, index, x)
@@ -229,6 +235,7 @@ package object cql {
     implicit val localDateReads: Reads[LocalDate]   = (row: Row, index: Int) => (row.getLocalDate(index), index + 1)
     implicit val instantReads: Reads[Instant]       = (row: Row, index: Int) => (row.getInstant(index), index + 1)
     implicit val booleanReads: Reads[Boolean]       = (row: Row, index: Int) => (row.getBoolean(index), index + 1)
+    implicit val uuidReads: Reads[UUID]             = (row: Row, index: Int) => (row.getUuid(index), index + 1)
 
     implicit def optionReads[T: Reads]: Reads[Option[T]] =
       (row: Row, index: Int) =>
