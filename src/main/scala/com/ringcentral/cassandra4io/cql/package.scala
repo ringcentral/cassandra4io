@@ -235,6 +235,7 @@ package object cql {
     implicit val localDateReads: Reads[LocalDate]   = (row: Row, index: Int) => (row.getLocalDate(index), index + 1)
     implicit val instantReads: Reads[Instant]       = (row: Row, index: Int) => (row.getInstant(index), index + 1)
     implicit val booleanReads: Reads[Boolean]       = (row: Row, index: Int) => (row.getBoolean(index), index + 1)
+    implicit val uuidReads: Reads[UUID]             = (row: Row, index: Int) => (row.getUuid(index), index + 1)
 
     implicit def optionReads[T: Reads]: Reads[Option[T]] =
       (row: Row, index: Int) =>
