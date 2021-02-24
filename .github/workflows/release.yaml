@@ -1,21 +1,20 @@
-name: Publish release
-
+name: Release
 on:
   push:
-    tags:
-      - '*'
-
+    branches: [main]
+    tags: ["*"]
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  publish:
+    runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up JDK
-        uses: actions/setup-java@v1
+      - uses: actions/checkout@v2.3.4
         with:
-          java-version: 11
-      - name: Publish release
+          fetch-depth: 0
+      - uses: olafurpg/setup-scala@v10
+      - uses: olafurpg/setup-gpg@v3
+      - run: sbt ci-release
         env:
-          BINTRAY_USER: ${{ secrets.BintrayUser }}
-          BINTRAY_PASS: ${{ secrets.BintrayPass }}
-        run: sbt +publish
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+          PGP_SECRET: ${{ secrets.PGP_SECRET }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
