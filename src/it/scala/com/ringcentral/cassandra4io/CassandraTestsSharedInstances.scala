@@ -1,24 +1,24 @@
 package com.ringcentral.cassandra4io
 
-import java.net.InetSocketAddress
-
-import cats.effect.{ Blocker, IO, Resource }
+import cats.effect.{Blocker, IO, Resource}
 import cats.implicits.catsSyntaxApplicative
-import com.dimafeng.testcontainers.CassandraContainer
-import weaver.IOSuite
 import cats.syntax.foldable._
 
+import com.datastax.oss.driver.api.core.{CqlSession, CqlSessionBuilder}
 import com.datastax.oss.driver.api.core.cql.SimpleStatement
-import com.datastax.oss.driver.api.core.{ CqlSession, CqlSessionBuilder }
+import com.dimafeng.testcontainers.CassandraContainer
 import com.ringcentral.cassandra4io.utils.JavaConcurrentToCats.fromJavaAsync
+import org.testcontainers.utility.DockerImageName
+import weaver.IOSuite
 
+import java.net.InetSocketAddress
 import scala.io.BufferedSource
 
 trait CassandraTestsSharedInstances { self: IOSuite =>
   val blocker = Blocker.liftExecutionContext(ec)
 
   val keyspace  = "cassandra4io"
-  val container = CassandraContainer("cassandra:3.11.8")
+  val container = CassandraContainer(DockerImageName.parse("cassandra:3.11.10"))
 
   def migrateSession(session: CassandraSession[IO]): IO[Unit] = {
     val migrationSource = blocker.delay(scala.io.Source.fromResource("migration/1__test_tables.cql"))

@@ -6,7 +6,7 @@ inThisBuild(
     organizationName := "ringcentral",
     licenses := List("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
     scalaVersion := crossScalaVersions.value.head,
-    crossScalaVersions := Seq("2.13.4", "2.12.11"),
+    crossScalaVersions := Seq("2.13.5", "2.12.11"),
     licenses := Seq(("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0"))),
     homepage := Some(url("https://github.com/ringcentral/cassandra4io")),
     developers := List(
@@ -28,12 +28,12 @@ lazy val root = (project in file("."))
     libraryDependencies ++= Seq(
       "org.typelevel"       %% "cats-effect"                    % "2.3.1",
       "co.fs2"              %% "fs2-core"                       % "2.5.0",
-      "com.datastax.oss"     % "java-driver-core"               % "4.9.0",
+      "com.datastax.oss"     % "java-driver-core"               % "4.11.0" % "provided",
       "com.chuusai"         %% "shapeless"                      % "2.3.3"
     ) ++ Seq(
       "com.disneystreaming" %% "weaver-framework"               % "0.5.1"  % "it,test",
-      "org.testcontainers"   % "testcontainers"                 % "1.15.1" % "it",
-      "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.38.6" % "it",
+      "org.testcontainers"   % "testcontainers"                 % "1.15.2" % "it",
+      "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.39.3" % "it",
       "ch.qos.logback"       % "logback-classic"                % "1.1.3"  % "it,test"
     ) ++ (scalaBinaryVersion.value match {
       case v if v.startsWith("2.13") =>
