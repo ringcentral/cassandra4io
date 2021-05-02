@@ -26,12 +26,12 @@ lazy val root = (project in file("."))
   .settings(
     Defaults.itSettings,
     libraryDependencies ++= Seq(
-      "org.typelevel"       %% "cats-effect"                    % "2.3.1",
-      "co.fs2"              %% "fs2-core"                       % "2.5.0",
+      "org.typelevel"       %% "cats-effect"                    % "3.1.0",
+      "co.fs2"              %% "fs2-core"                       % "3.0.2",
       "com.datastax.oss"     % "java-driver-core"               % "4.9.0",
       "com.chuusai"         %% "shapeless"                      % "2.3.3"
     ) ++ Seq(
-      "com.disneystreaming" %% "weaver-framework"               % "0.5.1"  % "it,test",
+      "com.disneystreaming" %% "weaver-cats"                    % "0.7.2"  % "it,test",
       "org.testcontainers"   % "testcontainers"                 % "1.15.1" % "it",
       "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.38.6" % "it",
       "ch.qos.logback"       % "logback-classic"                % "1.1.3"  % "it,test"
@@ -81,4 +81,4 @@ Compile / compile / scalacOptions ++= Seq(
     case other                     => sys.error(s"Unsupported scala version: $other")
   })
 
-testFrameworks := Seq(new TestFramework("weaver.framework.TestFramework"))
+testFrameworks += new TestFramework("weaver.framework.CatsEffect")

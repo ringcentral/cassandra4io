@@ -21,7 +21,7 @@ Cassandra4io is currently available for Scala 2.13 and 2.12.
 
 ### Add a dependency to your project
 ```scala
-libraryDependencies += ("com.ringcentral" %% "cassandra4io" % "0.1.5")
+libraryDependencies += ("com.ringcentral" %% "cassandra4io" % "0.1.6")
 ```
 
 ### Create a connection to Cassandra
@@ -39,7 +39,7 @@ val builder = CqlSession
       .withLocalDatacenter("datacenter1")
       .withKeyspace("awesome") 
 
-def makeSession[F[_]: Async: ContextShift]: Resource[F, CassandraSession[F]] =
+def makeSession[F[_]: Async]: Resource[F, CassandraSession[F]] =
   CassandraSession.connect(builder)
 ```
 
@@ -63,7 +63,7 @@ trait Dao[F[_]] {
   def get(id: Int): F[Option[Model]]
 }
 
-class DaoImpl[F[_]: Sync](session: CassandraSession[F]) extends Dao[F] {
+class DaoImpl[F[_]: Async](session: CassandraSession[F]) extends Dao[F] {
 
   private def insertQuery(value: Model) =
     cql"insert into table (id, data) values (${value.id}, ${value.data})"
@@ -82,7 +82,7 @@ this syntax reuse implicit driver prepared statements cache
 ### Templated syntax
 
 ```scala
-import cats.effect.Sync
+import cats.effect._
 import scala.concurrent.duration._
 import cats.syntax.all._
 import scala.jdk.DurationConverters._
@@ -103,7 +103,7 @@ object Dao {
     .config(_.setTimeout(1.second.toJava))
   private val selectQuery = cqlt"select id, data from table where id = ${Put[Int]}".as[Model]
 
-  def apply[F[_]: Sync](session: CassandraSession[F]) = for {
+  def apply[F[_]: Async](session: CassandraSession[F]) = for {
     insert <- insertQuery.prepare(session)
     select <- selectQuery.prepare(session)      
   } yield new Dao[F] {

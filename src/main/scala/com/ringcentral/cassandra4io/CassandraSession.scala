@@ -1,6 +1,6 @@
 package com.ringcentral.cassandra4io
 
-import cats.effect.{ Async, ContextShift, Resource }
+import cats.effect.{ Async, Resource }
 import cats.syntax.functor._
 import com.datastax.oss.driver.api.core.{ CqlSession, CqlSessionBuilder }
 import com.datastax.oss.driver.api.core.cql._
@@ -27,7 +27,7 @@ trait CassandraSession[F[_]] {
 
 object CassandraSession {
 
-  private class Live[F[_]: Async: ContextShift](
+  private class Live[F[_]: Async](
     underlying: CqlSession
   ) extends CassandraSession[F] {
 
@@ -68,7 +68,7 @@ object CassandraSession {
    * @tparam F rabbit hole
    * @return Resource with CassandraSession, use it wisely
    */
-  def connect[F[_]: Async: ContextShift](
+  def connect[F[_]: Async](
     builder: CqlSessionBuilder
   ): Resource[F, CassandraSession[F]] =
     Resource
