@@ -17,3 +17,15 @@ create table test_data_multiple_keys(
 );
 
 insert into test_data_multiple_keys (id1, id2, data) values (1, 2, 'one-two');
+
+create type basic_info(
+    weight double,
+    height text,
+    datapoints frozen<set<int>>
+);
+
+create table person_attributes(
+    person_id int,
+    info frozen<basic_info>,
+    PRIMARY KEY (person_id)
+);
