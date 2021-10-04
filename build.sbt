@@ -6,7 +6,7 @@ inThisBuild(
     organizationName := "ringcentral",
     licenses := List("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
     scalaVersion := crossScalaVersions.value.head,
-    crossScalaVersions := Seq("2.13.4", "2.12.11"),
+    crossScalaVersions := Seq("2.13.6", "2.12.12"),
     licenses := Seq(("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0"))),
     homepage := Some(url("https://github.com/ringcentral/cassandra4io")),
     developers := List(
@@ -26,15 +26,15 @@ lazy val root = (project in file("."))
   .settings(
     Defaults.itSettings,
     libraryDependencies ++= Seq(
-      "org.typelevel"       %% "cats-effect"                    % "3.1.0",
-      "co.fs2"              %% "fs2-core"                       % "3.0.2",
-      "com.datastax.oss"     % "java-driver-core"               % "4.9.0",
-      "com.chuusai"         %% "shapeless"                      % "2.3.3"
+      "org.typelevel"       %% "cats-effect"                    % "3.2.9",
+      "co.fs2"              %% "fs2-core"                       % "3.1.3",
+      "com.datastax.oss"     % "java-driver-core"               % "4.13.0",
+      "com.chuusai"         %% "shapeless"                      % "2.3.7"
     ) ++ Seq(
-      "com.disneystreaming" %% "weaver-cats"                    % "0.7.2"  % "it,test",
-      "org.testcontainers"   % "testcontainers"                 % "1.15.1" % "it",
-      "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.38.6" % "it",
-      "ch.qos.logback"       % "logback-classic"                % "1.1.3"  % "it,test"
+      "com.disneystreaming" %% "weaver-cats"                    % "0.7.6"  % "it,test",
+      "org.testcontainers"   % "testcontainers"                 % "1.15.3" % "it",
+      "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.39.8" % "it",
+      "ch.qos.logback"       % "logback-classic"                % "1.2.6"  % "it,test"
     ) ++ (scalaBinaryVersion.value match {
       case v if v.startsWith("2.13") =>
         Seq.empty
