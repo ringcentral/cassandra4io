@@ -7,7 +7,7 @@ This is lightweight cats-effect and fs2 IO wrapper for latest datastax 4.x drive
 Why 4.x?
  
 4.x was re-written in immutable first design, within async first API, 
-optimizations, less allocations, metrics improvements, and fully compatible with cassandra 3.x
+optimizations, fewer allocations, metrics improvements, and fully compatible with cassandra 3.x
 
 ## Goals
 - Be safe, type-safe.
@@ -113,9 +113,77 @@ object Dao {
 } 
 ```
 
+## User Defined Type (UDT) support
+
+Cassandra4IO provides support for Cassandra's User Defined Type (UDT) values. 
+For example, given the following Cassandra schema:
+
+```cql
+create type basic_info(
+    weight double,
+    height text,
+    datapoints frozen<set<int>>
+);
+
+create table person_attributes(
+    person_id int,
+    info frozen<basic_info>,
+    PRIMARY KEY (person_id)
+);
+```
+
+**Note:** `frozen` means immutable
+
+Here is how to insert and select data from the `person_attributes` table:
+
+```scala
+final case class BasicInfo(weight: Double, height: String, datapoints: Set[Int])
+object BasicInfo {
+  import scala.jdk.CollectionConverters._
+
+  implicit val cqlReads: Reads[BasicInfo] = Reads[UdtValue].map { udtValue =>
+    BasicInfo(
+      weight = udtValue.getDouble("weight"),
+      height = udtValue.getString("height"),
+      datapoints = udtValue
+        .getSet[java.lang.Integer]("datapoints", classOf[java.lang.Integer])
+        .asScala
+        .toSet
+        .map { int: java.lang.Integer => Int.unbox(int) }
+    )
+  }
+
+  implicit val cqlBinder: Binder[BasicInfo] = Binder[UdtValue].contramapUDT { (info, constructor) =>
+    constructor
+      .newValue()
+      .setDouble("weight", info.weight)
+      .setString("height", info.height)
+      .setSet("datapoints", info.datapoints.map(Int.box).asJava, classOf[java.lang.Integer])
+  }
+}
+
+final case class PersonAttribute(personId: Int, info: BasicInfo)
+```
+
+Notice that we make use of the existing typeclass instances for `UdtValue` (the underlying Datastax Java driver datatype) 
+and we transform our Scala data-types to and from `UdtValue`. This allows us to read and write data to/from Cassandra:
+
+```scala
+class UDTUsageExample[F[_]: Async](session: CassandraSession[F]) {
+  val data = PersonAttribute(1, BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
+  val insert: F[Boolean] =
+    cql"INSERT INTO cassandra4io.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+            .execute(session)
+
+  val retrieve: fs2.Stream[F, PersonAttribute] = 
+    cql"SELECT person_id, info FROM cassandra4io.person_attributes WHERE person_id = ${data.personId}"
+            .as[PersonAttribute]
+            .select(session)
+}
+```
 
 ## References
-- java driver https://docs.datastax.com/en/developer/java-driver/4.9/
+- [Datastax Java driver](https://docs.datastax.com/en/developer/java-driver/4.9)
 
 ## License
 Cassandra4io is released under the [Apache License 2.0](https://opensource.org/licenses/Apache-2.0).
