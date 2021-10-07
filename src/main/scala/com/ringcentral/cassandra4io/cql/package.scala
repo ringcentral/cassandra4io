@@ -2,12 +2,13 @@ package com.ringcentral.cassandra4io
 
 import java.nio.ByteBuffer
 import java.time.{ Instant, LocalDate }
-
 import cats.data.OptionT
 import cats.{ Functor, Monad }
 import cats.syntax.flatMap._
 import cats.syntax.functor._
+import com.datastax.oss.driver.api.core.`type`.UserDefinedType
 import com.datastax.oss.driver.api.core.cql.{ BatchStatementBuilder, BatchType, BoundStatement, PreparedStatement, Row }
+import com.datastax.oss.driver.api.core.data.UdtValue
 import fs2.Stream
 import shapeless._
 
@@ -101,8 +102,8 @@ package object cql {
         override def binder: Binder[HNil] = Binder[HNil]
       }
       implicit def hConsBindableBuilder[PH <: Put[_], T: Binder, PT <: HList, RT <: HList](implicit
-                                                                                           f: BindableBuilder.Aux[PT, RT]
-                                                                                          ): BindableBuilder.Aux[Put[T] :: PT, T :: RT]                                            = new BindableBuilder[Put[T] :: PT] {
+        f: BindableBuilder.Aux[PT, RT]
+      ): BindableBuilder.Aux[Put[T] :: PT, T :: RT]                                            = new BindableBuilder[Put[T] :: PT] {
         override type Repr = T :: RT
         override def binder: Binder[T :: RT] = {
           implicit val tBinder: Binder[RT] = f.binder
@@ -128,8 +129,13 @@ package object cql {
 
   Construct it if needed, please refer to Binder source code for guidance
 """)
-  trait Binder[T] {
+  trait Binder[T] { self =>
     def bind(statement: BoundStatement, index: Int, value: T): (BoundStatement, Int)
+
+    def contramap[U](f: U => T): Binder[U] = new Binder[U] {
+      override def bind(statement: BoundStatement, index: Int, value: U): (BoundStatement, Int) =
+        self.bind(statement, index, f(value))
+    }
   }
 
   trait Put[T]
@@ -137,7 +143,7 @@ package object cql {
     def apply[T: Binder]: Put[T] = new Put[T] {}
   }
 
-  object Binder {
+  object Binder extends BinderLowPriority {
 
     def apply[T](implicit binder: Binder[T]): Binder[T] = binder
 
@@ -186,6 +192,9 @@ package object cql {
         (statement.setUuid(index, value), index + 1)
     }
 
+    implicit val userDefinedTypeValueBinder: Binder[UdtValue] =
+      (statement: BoundStatement, index: Int, value: UdtValue) => (statement.setUdtValue(index, value), index + 1)
+
     implicit def optionBinder[T: Binder]: Binder[Option[T]] = new Binder[Option[T]] {
       override def bind(statement: BoundStatement, index: Int, value: Option[T]): (BoundStatement, Int) = value match {
         case Some(x) => Binder[T].bind(statement, index, x)
@@ -203,6 +212,36 @@ package object cql {
         (statement.setList(index, value.asJava, implicitly[ClassTag[T]].runtimeClass.asInstanceOf[Class[T]]), index + 1)
     }
 
+    implicit def widenBinder[T: Binder, X <: T](implicit wd: Widen.Aux[X, T]): Binder[X] = new Binder[X] {
+      override def bind(statement: BoundStatement, index: Int, value: X): (BoundStatement, Int) =
+        Binder[T].bind(statement, index, wd.apply(value))
+    }
+
+    implicit class UdtValueBinderOps(udtBinder: Binder[UdtValue]) {
+
+      /**
+       * This is necessary for UDT values as you are not allowed to safely create a UDT value, instead you use the
+       * prepared statement's variable definitions to retrieve a UserDefinedType that can be used as a constructor
+       * for a UdtValue
+       *
+       * @param f is a function that accepts the input value A along with a constructor that you use to build the
+       *          UdtValue that gets sent to Cassandra
+       * @tparam A
+       * @return
+       */
+      def contramapUDT[A](f: (A, UserDefinedType) => UdtValue): Binder[A] = new Binder[A] {
+        override def bind(statement: BoundStatement, index: Int, value: A): (BoundStatement, Int) = {
+          val udtValue = f(
+            value,
+            statement.getPreparedStatement.getVariableDefinitions.get(index).getType.asInstanceOf[UserDefinedType]
+          )
+          udtBinder.bind(statement, index, udtValue)
+        }
+      }
+    }
+  }
+
+  trait BinderLowPriority {
     implicit val hNilBinder: Binder[HNil]                                   = new Binder[HNil] {
       override def bind(statement: BoundStatement, index: Int, value: HNil): (BoundStatement, Int) = (statement, index)
     }
@@ -212,17 +251,20 @@ package object cql {
         Binder[T].bind(applied, nextIndex, value.tail)
       }
     }
-
-    implicit def widenBinder[T: Binder, X <: T](implicit wd: Widen.Aux[X, T]): Binder[X] = new Binder[X] {
-      override def bind(statement: BoundStatement, index: Int, value: X): (BoundStatement, Int) =
-        Binder[T].bind(statement, index, wd.apply(value))
-    }
   }
 
-  trait Reads[T] {
+  trait Reads[T] { self =>
     def read(row: Row, index: Int): (T, Int)
+
+    def map[U](f: T => U): Reads[U] =
+      new Reads[U] {
+        override def read(row: Row, index: Int): (U, Int) = {
+          val (t, nextIndex) = self.read(row, index)
+          (f(t), nextIndex)
+        }
+      }
   }
-  object Reads   {
+  object Reads extends ReadsLowPriority {
     def apply[T](implicit r: Reads[T]): Reads[T] = r
 
     implicit val rowReads: Reads[Row] = (row: Row, i: Int) => (row, i)
@@ -236,6 +278,7 @@ package object cql {
     implicit val instantReads: Reads[Instant]       = (row: Row, index: Int) => (row.getInstant(index), index + 1)
     implicit val booleanReads: Reads[Boolean]       = (row: Row, index: Int) => (row.getBoolean(index), index + 1)
     implicit val uuidReads: Reads[UUID]             = (row: Row, index: Int) => (row.getUuid(index), index + 1)
+    implicit val udtReads: Reads[UdtValue]          = (row: Row, index: Int) => (row.getUdtValue(index), index + 1)
 
     implicit def optionReads[T: Reads]: Reads[Option[T]] =
       (row: Row, index: Int) =>
@@ -247,7 +290,9 @@ package object cql {
 
     implicit def arrayReads[T](implicit ct: ClassTag[T]): Reads[List[T]] =
       (row: Row, index: Int) => (row.getList(index, ct.runtimeClass.asInstanceOf[Class[T]]).asScala.toList, index + 1)
+  }
 
+  trait ReadsLowPriority {
     implicit val hNilParser: Reads[HNil] = (_: Row, index: Int) => (HNil, index)
 
     implicit def hConsParser[H: Reads, T <: HList: Reads]: Reads[H :: T] = (row: Row, index: Int) => {

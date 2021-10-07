@@ -1,6 +1,7 @@
 package com.ringcentral.cassandra4io.cql
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel
+import com.datastax.oss.driver.api.core.data.UdtValue
 import com.ringcentral.cassandra4io.CassandraTestsSharedInstances
 import fs2.Stream
 import weaver._
@@ -10,6 +11,33 @@ import java.time.Duration
 trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
 
   case class Data(id: Long, data: String)
+
+  case class BasicInfo(weight: Double, height: String, datapoints: Set[Int])
+  object BasicInfo {
+    import scala.jdk.CollectionConverters._
+
+    implicit val cqlReads: Reads[BasicInfo] = Reads[UdtValue].map { udtValue =>
+      BasicInfo(
+        weight = udtValue.getDouble("weight"),
+        height = udtValue.getString("height"),
+        datapoints = udtValue
+          .getSet[java.lang.Integer]("datapoints", classOf[java.lang.Integer])
+          .asScala
+          .toSet
+          .map { int: java.lang.Integer => Int.unbox(int) }
+      )
+    }
+
+    implicit val cqlBinder: Binder[BasicInfo] = Binder[UdtValue].contramapUDT { (info, constructor) =>
+      constructor
+        .newValue()
+        .setDouble("weight", info.weight)
+        .setString("height", info.height)
+        .setSet("datapoints", info.datapoints.map(Int.box).asJava, classOf[java.lang.Integer])
+    }
+  }
+
+  case class PersonAttribute(personId: Int, info: BasicInfo)
 
   test("interpolated select template should return data from migration") { session =>
     for {
@@ -108,6 +136,26 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
     for {
       results <- getIds(List(1, 2, 3)).select(session).compile.toList
     } yield expect(results == Seq(Data(1, "one"), Data(2, "two"), Data(3, "three")))
+  }
+
+  test(
+    "interpolated inserts and selects should produce UDTs and return data case classes when nested case classes are used"
+  ) { session =>
+    val data   = PersonAttribute(1, BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
+    val insert =
+      cql"INSERT INTO cassandra4io.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+        .execute(session)
+
+    val retrieve = cql"SELECT person_id, info FROM cassandra4io.person_attributes WHERE person_id = ${data.personId}"
+      .as[PersonAttribute]
+      .select(session)
+      .compile
+      .toList
+
+    for {
+      _      <- insert
+      result <- retrieve
+    } yield expect(result.length == 1 && result.head == data)
   }
 
   test("interpolated select should bind constants") { session =>
