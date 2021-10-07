@@ -29,3 +29,11 @@ create table person_attributes(
     info frozen<basic_info>,
     PRIMARY KEY (person_id)
 );
+
+create table test_collection(
+    id int,
+    maptest frozen<map<text, uuid>>,
+    settest frozen<set<int>>,
+    listtest frozen<list<date>>,
+    PRIMARY KEY (id)
+);

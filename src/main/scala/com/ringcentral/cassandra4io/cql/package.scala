@@ -1,21 +1,20 @@
 package com.ringcentral.cassandra4io
 
-import java.nio.ByteBuffer
-import java.time.{ Instant, LocalDate }
 import cats.data.OptionT
-import cats.{ Functor, Monad }
 import cats.syntax.flatMap._
 import cats.syntax.functor._
+import cats.{ Functor, Monad }
 import com.datastax.oss.driver.api.core.`type`.UserDefinedType
-import com.datastax.oss.driver.api.core.cql.{ BatchStatementBuilder, BatchType, BoundStatement, PreparedStatement, Row }
+import com.datastax.oss.driver.api.core.cql._
 import com.datastax.oss.driver.api.core.data.UdtValue
 import fs2.Stream
 import shapeless._
 
+import java.nio.ByteBuffer
+import java.time.{ Instant, LocalDate }
 import java.util.UUID
 import scala.annotation.implicitNotFound
 import scala.jdk.CollectionConverters._
-import scala.reflect.ClassTag
 
 package object cql {
 
@@ -192,6 +191,21 @@ package object cql {
         (statement.setUuid(index, value), index + 1)
     }
 
+    implicit val bigIntBinder: Binder[BigInt] = new Binder[BigInt] {
+      override def bind(statement: BoundStatement, index: Int, value: BigInt): (BoundStatement, Int) =
+        (statement.setBigInteger(index, value.bigInteger), index + 1)
+    }
+
+    implicit val bigDecimalBinder: Binder[BigDecimal] = new Binder[BigDecimal] {
+      override def bind(statement: BoundStatement, index: Int, value: BigDecimal): (BoundStatement, Int) =
+        (statement.setBigDecimal(index, value.bigDecimal), index + 1)
+    }
+
+    implicit val shortBinder: Binder[Short] = new Binder[Short] {
+      override def bind(statement: BoundStatement, index: Int, value: Short): (BoundStatement, Int) =
+        (statement.setShort(index, value), index + 1)
+    }
+
     implicit val userDefinedTypeValueBinder: Binder[UdtValue] =
       (statement: BoundStatement, index: Int, value: UdtValue) => (statement.setUdtValue(index, value), index + 1)
 
@@ -202,15 +216,26 @@ package object cql {
       }
     }
 
-    implicit val longListBinder: Binder[List[Long]] = new Binder[List[Long]] {
-      override def bind(statement: BoundStatement, index: Int, value: List[Long]): (BoundStatement, Int) =
-        (statement.setList(index, value.map(Long.box).asJava, classOf[java.lang.Long]), index + 1)
+    implicit def listPrimBinder[T](implicit ev: CassPrimType[T]): Binder[List[T]] = new Binder[List[T]] {
+      override def bind(statement: BoundStatement, index: Int, value: List[T]): (BoundStatement, Int) =
+        (statement.setList[ev.CassType](index, value.map(ev.toCassandra(_)).asJava, ev.cassType), index + 1)
     }
 
-    implicit def listBinder[T: Binder: ClassTag]: Binder[List[T]] = new Binder[List[T]] {
-      override def bind(statement: BoundStatement, index: Int, value: List[T]): (BoundStatement, Int) =
-        (statement.setList(index, value.asJava, implicitly[ClassTag[T]].runtimeClass.asInstanceOf[Class[T]]), index + 1)
+    implicit def setPrimBinder[T](implicit ev: CassPrimType[T]): Binder[Set[T]] = new Binder[Set[T]] {
+      override def bind(statement: BoundStatement, index: Int, value: Set[T]): (BoundStatement, Int) =
+        (statement.setSet[ev.CassType](index, value.map(ev.toCassandra(_)).asJava, ev.cassType), index + 1)
     }
+
+    implicit def mapPrimBinder[K, V](implicit evK: CassPrimType[K], evV: CassPrimType[V]): Binder[Map[K, V]] =
+      new Binder[Map[K, V]] {
+        override def bind(statement: BoundStatement, index: Int, value: Map[K, V]): (BoundStatement, Int) = {
+          val cassMap = value.map { case (k, v) => (evK.toCassandra(k), evV.toCassandra(v)) }.asJava
+          (
+            statement.setMap[evK.CassType, evV.CassType](index, cassMap, evK.cassType, evV.cassType),
+            index + 1
+          )
+        }
+      }
 
     implicit def widenBinder[T: Binder, X <: T](implicit wd: Widen.Aux[X, T]): Binder[X] = new Binder[X] {
       override def bind(statement: BoundStatement, index: Int, value: X): (BoundStatement, Int) =
@@ -278,6 +303,9 @@ package object cql {
     implicit val instantReads: Reads[Instant]       = (row: Row, index: Int) => (row.getInstant(index), index + 1)
     implicit val booleanReads: Reads[Boolean]       = (row: Row, index: Int) => (row.getBoolean(index), index + 1)
     implicit val uuidReads: Reads[UUID]             = (row: Row, index: Int) => (row.getUuid(index), index + 1)
+    implicit val bigIntReads: Reads[BigInt]         = (row: Row, index: Int) => (row.getBigInteger(index), index + 1)
+    implicit val bigDecimalReads: Reads[BigDecimal] = (row: Row, index: Int) => (row.getBigDecimal(index), index + 1)
+    implicit val shortReads: Reads[Short]           = (row: Row, index: Int) => (row.getShort(index), index + 1)
     implicit val udtReads: Reads[UdtValue]          = (row: Row, index: Int) => (row.getUdtValue(index), index + 1)
 
     implicit def optionReads[T: Reads]: Reads[Option[T]] =
@@ -288,8 +316,32 @@ package object cql {
           Some(t) -> i
         }
 
-    implicit def arrayReads[T](implicit ct: ClassTag[T]): Reads[List[T]] =
-      (row: Row, index: Int) => (row.getList(index, ct.runtimeClass.asInstanceOf[Class[T]]).asScala.toList, index + 1)
+    implicit def listReads[T](implicit ev: CassPrimType[T]): Reads[List[T]] =
+      (row: Row, index: Int) =>
+        (
+          row.getList(index, ev.cassType).asScala.map(ev.fromCassandra(_)).toList,
+          index + 1
+        )
+
+    implicit def setReads[T](implicit ev: CassPrimType[T]): Reads[Set[T]] =
+      (row: Row, index: Int) =>
+        (
+          row.getSet(index, ev.cassType).asScala.map(ev.fromCassandra(_)).toSet,
+          index + 1
+        )
+
+    implicit def mapReads[K, V](implicit evK: CassPrimType[K], evV: CassPrimType[V]): Reads[Map[K, V]] =
+      (row: Row, index: Int) =>
+        (
+          row
+            .getMap(index, evK.cassType, evV.cassType)
+            .asScala
+            .map { case (casK, casV) =>
+              (evK.fromCassandra(casK), evV.fromCassandra(casV))
+            }
+            .toMap,
+          index + 1
+        )
   }
 
   trait ReadsLowPriority {
