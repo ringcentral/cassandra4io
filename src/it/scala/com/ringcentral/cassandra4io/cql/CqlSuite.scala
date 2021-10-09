@@ -6,7 +6,8 @@ import com.ringcentral.cassandra4io.CassandraTestsSharedInstances
 import fs2.Stream
 import weaver._
 
-import java.time.Duration
+import java.time.{ Duration, LocalDate }
+import java.util.UUID
 
 trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
 
@@ -38,6 +39,8 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
   }
 
   case class PersonAttribute(personId: Int, info: BasicInfo)
+
+  case class CollectionTestRow(id: Int, maptest: Map[String, UUID], settest: Set[Int], listtest: List[LocalDate])
 
   test("interpolated select template should return data from migration") { session =>
     for {
@@ -151,6 +154,26 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
       .select(session)
       .compile
       .toList
+
+    for {
+      _      <- insert
+      result <- retrieve
+    } yield expect(result.length == 1 && result.head == data)
+  }
+
+  test("interpolated inserts and selects should handle cassandra collections") { session =>
+    val data = CollectionTestRow(1, Map("2" -> UUID.randomUUID()), Set(1, 2, 3), List(LocalDate.now()))
+
+    val insert =
+      cql"INSERT INTO cassandra4io.test_collection (id, maptest, settest, listtest) VALUES (${data.id}, ${data.maptest}, ${data.settest}, ${data.listtest})"
+        .execute(session)
+
+    val retrieve =
+      cql"SELECT id, maptest, settest, listtest FROM cassandra4io.test_collection WHERE id = ${data.id}"
+        .as[CollectionTestRow]
+        .select(session)
+        .compile
+        .toList
 
     for {
       _      <- insert
