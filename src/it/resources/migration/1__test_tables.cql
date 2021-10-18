@@ -37,3 +37,38 @@ create table test_collection(
     listtest frozen<list<date>>,
     PRIMARY KEY (id)
 );
+
+CREATE TYPE example_type(
+    x bigint,
+    y bigint,
+    date date,
+    time time
+);
+
+CREATE TYPE example_nested_type(
+    a int,
+    b text,
+    c frozen<example_type>
+);
+
+CREATE TYPE example_collection_nested_udt_type(
+    a int,
+    b frozen<map<int,frozen<set<frozen<set<frozen<set<frozen<set<example_nested_type>>>>>>>>>>
+);
+
+CREATE TYPE example_nested_primitive_type(
+    a int,
+    b frozen<map<int, frozen<set<frozen<set<frozen<set<frozen<set<int>>>>>>>>>>
+);
+
+CREATE TABLE heavily_nested_udt_table(
+    id int,
+    data example_collection_nested_udt_type,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE heavily_nested_prim_table(
+    id int,
+    data example_nested_primitive_type,
+    PRIMARY KEY (id)
+);

@@ -6,7 +6,7 @@ import com.ringcentral.cassandra4io.CassandraTestsSharedInstances
 import fs2.Stream
 import weaver._
 
-import java.time.{ Duration, LocalDate }
+import java.time.{ Duration, LocalDate, LocalTime }
 import java.util.UUID
 
 trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
@@ -15,32 +15,39 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
 
   case class BasicInfo(weight: Double, height: String, datapoints: Set[Int])
   object BasicInfo {
-    import scala.jdk.CollectionConverters._
-
-    implicit val cqlReads: Reads[BasicInfo] = Reads[UdtValue].map { udtValue =>
-      BasicInfo(
-        weight = udtValue.getDouble("weight"),
-        height = udtValue.getString("height"),
-        datapoints = udtValue
-          .getSet[java.lang.Integer]("datapoints", classOf[java.lang.Integer])
-          .asScala
-          .toSet
-          .map { int: java.lang.Integer => Int.unbox(int) }
-      )
-    }
-
-    implicit val cqlBinder: Binder[BasicInfo] = Binder[UdtValue].contramapUDT { (info, constructor) =>
-      constructor
-        .newValue()
-        .setDouble("weight", info.weight)
-        .setString("height", info.height)
-        .setSet("datapoints", info.datapoints.map(Int.box).asJava, classOf[java.lang.Integer])
-    }
+    implicit val cqlReads: Reads[BasicInfo]   = FromUdtValue.deriveReads[BasicInfo]
+    implicit val cqlBinder: Binder[BasicInfo] = ToUdtValue.deriveBinder[BasicInfo]
   }
 
   case class PersonAttribute(personId: Int, info: BasicInfo)
 
   case class CollectionTestRow(id: Int, maptest: Map[String, UUID], settest: Set[Int], listtest: List[LocalDate])
+
+  case class ExampleType(x: Long, y: Long, date: LocalDate, time: LocalTime)
+
+  case class ExampleNestedType(a: Int, b: String, c: ExampleType)
+
+  case class ExampleCollectionNestedUdtType(a: Int, b: Map[Int, Set[Set[Set[Set[ExampleNestedType]]]]])
+  object ExampleCollectionNestedUdtType {
+    implicit val binderExampleCollectionNestedUdtType: Binder[ExampleCollectionNestedUdtType] =
+      ToUdtValue.deriveBinder[ExampleCollectionNestedUdtType]
+
+    implicit val readsExampleCollectionNestedUdtType: Reads[ExampleCollectionNestedUdtType] =
+      FromUdtValue.deriveReads[ExampleCollectionNestedUdtType]
+  }
+
+  case class ExampleNestedPrimitiveType(a: Int, b: Map[Int, Set[Set[Set[Set[Int]]]]])
+  object ExampleNestedPrimitiveType {
+    implicit val binderExampleNestedPrimitiveType: Binder[ExampleNestedPrimitiveType] =
+      ToUdtValue.deriveBinder[ExampleNestedPrimitiveType]
+
+    implicit val readsExampleNestedPrimitiveType: Reads[ExampleNestedPrimitiveType] =
+      FromUdtValue.deriveReads[ExampleNestedPrimitiveType]
+  }
+
+  case class TableContainingExampleCollectionNestedUdtType(id: Int, data: ExampleCollectionNestedUdtType)
+
+  case class TableContainingExampleNestedPrimitiveType(id: Int, data: ExampleNestedPrimitiveType)
 
   test("interpolated select template should return data from migration") { session =>
     for {
@@ -179,6 +186,84 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
       _      <- insert
       result <- retrieve
     } yield expect(result.length == 1 && result.head == data)
+  }
+
+  test("interpolated inserts and selects should handle nested UDTs in heavily nested collections") { session =>
+    val row    = TableContainingExampleCollectionNestedUdtType(
+      id = 1,
+      data = ExampleCollectionNestedUdtType(
+        a = 2,
+        b = Map(
+          1 -> Set(
+            Set(
+              Set(
+                Set(
+                  ExampleNestedType(
+                    a = 3,
+                    b = "4",
+                    c = ExampleType(x = 5L, y = 6L, date = LocalDate.now(), time = LocalTime.now())
+                  )
+                )
+              )
+            )
+          ),
+          2 -> Set(
+            Set(
+              Set(
+                Set(
+                  ExampleNestedType(
+                    a = 10,
+                    b = "100",
+                    c = ExampleType(x = 105L, y = 106L, date = LocalDate.now(), time = LocalTime.now())
+                  )
+                )
+              )
+            )
+          )
+        )
+      )
+    )
+    val insert =
+      cql"INSERT INTO cassandra4io.heavily_nested_udt_table (id, data) VALUES (${row.id}, ${row.data})".execute(session)
+
+    val retrieve = cql"SELECT id, data FROM cassandra4io.heavily_nested_udt_table WHERE id = ${row.id}"
+      .as[TableContainingExampleCollectionNestedUdtType]
+      .select(session)
+      .compile
+      .toList
+
+    for {
+      _      <- insert
+      actual <- retrieve
+    } yield expect(actual.length == 1 && actual.head == row)
+  }
+
+  test("interpolated inserts and selects should handle UDTs and primitives in heavily nested collections") { session =>
+    val row    = TableContainingExampleNestedPrimitiveType(
+      id = 1,
+      data = ExampleNestedPrimitiveType(
+        a = 1,
+        b = Map(
+          1 -> Set(Set(Set(Set(2, 3), Set(4, 5)))),
+          2 -> Set(Set(Set(Set(7, 8))))
+        )
+      )
+    )
+    val insert =
+      cql"INSERT INTO cassandra4io.heavily_nested_prim_table (id, data) VALUES (${row.id}, ${row.data})".execute(
+        session
+      )
+
+    val retrieve = cql"SELECT id, data FROM cassandra4io.heavily_nested_prim_table WHERE id = ${row.id}"
+      .as[TableContainingExampleNestedPrimitiveType]
+      .select(session)
+      .compile
+      .toList
+
+    for {
+      _      <- insert
+      actual <- retrieve
+    } yield expect(actual.length == 1 && actual.head == row)
   }
 
   test("interpolated select should bind constants") { session =>
