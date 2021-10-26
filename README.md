@@ -139,8 +139,38 @@ Here is how to insert and select data from the `person_attributes` table:
 ```scala
 final case class BasicInfo(weight: Double, height: String, datapoints: Set[Int])
 object BasicInfo {
-  import scala.jdk.CollectionConverters._
+  implicit val cqlReads: Reads[BasicInfo]   = FromUdtValue.deriveReads[BasicInfo]
+  implicit val cqlBinder: Binder[BasicInfo] = ToUdtValue.deriveBinder[BasicInfo]
+}
 
+final case class PersonAttribute(personId: Int, info: BasicInfo)
+```
+
+We provide a set of typeclasses (`FromUdtValue` and `ToUDtValue`) under the hood that automatically convert your Scala 
+types into types that Cassandra can understand without having to manually convert your data-types into Datastax Java 
+driver's `UdtValue`s. 
+
+```scala
+class UDTUsageExample[F[_]: Async](session: CassandraSession[F]) {
+  val data = PersonAttribute(1, BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
+  val insert: F[Boolean] =
+    cql"INSERT INTO cassandra4io.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+            .execute(session)
+
+  val retrieve: fs2.Stream[F, PersonAttribute] = 
+    cql"SELECT person_id, info FROM cassandra4io.person_attributes WHERE person_id = ${data.personId}"
+            .as[PersonAttribute]
+            .select(session)
+}
+```
+
+### More control over the transformation process of `UdtValue`s
+
+If you wanted to have additional control into how you map data-types to and from Cassandra rather than using `FromUdtValue`
+& `ToUdtValue`, we expose the Datastax Java driver API to you for full control. Here is an example using `BasicInfo`:
+
+```scala
+object BasicInfo {
   implicit val cqlReads: Reads[BasicInfo] = Reads[UdtValue].map { udtValue =>
     BasicInfo(
       weight = udtValue.getDouble("weight"),
@@ -161,26 +191,10 @@ object BasicInfo {
       .setSet("datapoints", info.datapoints.map(Int.box).asJava, classOf[java.lang.Integer])
   }
 }
-
-final case class PersonAttribute(personId: Int, info: BasicInfo)
 ```
 
-Notice that we make use of the existing typeclass instances for `UdtValue` (the underlying Datastax Java driver datatype) 
-and we transform our Scala data-types to and from `UdtValue`. This allows us to read and write data to/from Cassandra:
-
-```scala
-class UDTUsageExample[F[_]: Async](session: CassandraSession[F]) {
-  val data = PersonAttribute(1, BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
-  val insert: F[Boolean] =
-    cql"INSERT INTO cassandra4io.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
-            .execute(session)
-
-  val retrieve: fs2.Stream[F, PersonAttribute] = 
-    cql"SELECT person_id, info FROM cassandra4io.person_attributes WHERE person_id = ${data.personId}"
-            .as[PersonAttribute]
-            .select(session)
-}
-```
+Please note that we recommend using `FromUdtValue` and `ToUdtValue` to automatically derive this hand-written (and error-prone) 
+code. 
 
 ## References
 - [Datastax Java driver](https://docs.datastax.com/en/developer/java-driver/4.9)

@@ -7,6 +7,7 @@ import cats.{ Functor, Monad }
 import com.datastax.oss.driver.api.core.`type`.UserDefinedType
 import com.datastax.oss.driver.api.core.cql._
 import com.datastax.oss.driver.api.core.data.UdtValue
+import com.datastax.oss.driver.internal.core.`type`.{ DefaultListType, DefaultMapType, DefaultSetType }
 import fs2.Stream
 import shapeless._
 
@@ -142,7 +143,7 @@ package object cql {
     def apply[T: Binder]: Put[T] = new Put[T] {}
   }
 
-  object Binder extends BinderLowPriority {
+  object Binder extends BinderLowerPriority with BinderLowestPriority {
 
     def apply[T](implicit binder: Binder[T]): Binder[T] = binder
 
@@ -216,27 +217,6 @@ package object cql {
       }
     }
 
-    implicit def listPrimBinder[T](implicit ev: CassPrimType[T]): Binder[List[T]] = new Binder[List[T]] {
-      override def bind(statement: BoundStatement, index: Int, value: List[T]): (BoundStatement, Int) =
-        (statement.setList[ev.CassType](index, value.map(ev.toCassandra(_)).asJava, ev.cassType), index + 1)
-    }
-
-    implicit def setPrimBinder[T](implicit ev: CassPrimType[T]): Binder[Set[T]] = new Binder[Set[T]] {
-      override def bind(statement: BoundStatement, index: Int, value: Set[T]): (BoundStatement, Int) =
-        (statement.setSet[ev.CassType](index, value.map(ev.toCassandra(_)).asJava, ev.cassType), index + 1)
-    }
-
-    implicit def mapPrimBinder[K, V](implicit evK: CassPrimType[K], evV: CassPrimType[V]): Binder[Map[K, V]] =
-      new Binder[Map[K, V]] {
-        override def bind(statement: BoundStatement, index: Int, value: Map[K, V]): (BoundStatement, Int) = {
-          val cassMap = value.map { case (k, v) => (evK.toCassandra(k), evV.toCassandra(v)) }.asJava
-          (
-            statement.setMap[evK.CassType, evV.CassType](index, cassMap, evK.cassType, evV.cassType),
-            index + 1
-          )
-        }
-      }
-
     implicit def widenBinder[T: Binder, X <: T](implicit wd: Widen.Aux[X, T]): Binder[X] = new Binder[X] {
       override def bind(statement: BoundStatement, index: Int, value: X): (BoundStatement, Int) =
         Binder[T].bind(statement, index, wd.apply(value))
@@ -266,7 +246,23 @@ package object cql {
     }
   }
 
-  trait BinderLowPriority {
+  trait BinderLowerPriority {
+
+    /**
+     * This typeclass instance is used to (inductively) derive datatypes that can have arbitrary amounts of nesting
+     * @param ev is evidence that a typeclass instance of CassandraTypeMapper exists for A
+     * @tparam A is the Scala datatype that needs to be written to Cassandra
+     * @return
+     */
+    implicit def deriveBinderFromCassandraTypeMapper[A](implicit ev: CassandraTypeMapper[A]): Binder[A] =
+      (statement: BoundStatement, index: Int, value: A) => {
+        val datatype  = statement.getType(index)
+        val cassandra = ev.toCassandra(value, datatype)
+        (statement.set(index, cassandra, ev.classType), index + 1)
+      }
+  }
+
+  trait BinderLowestPriority {
     implicit val hNilBinder: Binder[HNil]                                   = new Binder[HNil] {
       override def bind(statement: BoundStatement, index: Int, value: HNil): (BoundStatement, Int) = (statement, index)
     }
@@ -289,11 +285,10 @@ package object cql {
         }
       }
   }
-  object Reads extends ReadsLowPriority {
+  object Reads extends ReadsLowerPriority with ReadsLowestPriority {
     def apply[T](implicit r: Reads[T]): Reads[T] = r
 
-    implicit val rowReads: Reads[Row] = (row: Row, i: Int) => (row, i)
-
+    implicit val rowReads: Reads[Row]               = (row: Row, i: Int) => (row, i)
     implicit val stringReads: Reads[String]         = (row: Row, index: Int) => (row.getString(index), index + 1)
     implicit val doubleReads: Reads[Double]         = (row: Row, index: Int) => (row.getDouble(index), index + 1)
     implicit val intReads: Reads[Int]               = (row: Row, index: Int) => (row.getInt(index), index + 1)
@@ -315,36 +310,46 @@ package object cql {
           val (t, i) = Reads[T].read(row, index)
           Some(t) -> i
         }
-
-    implicit def listReads[T](implicit ev: CassPrimType[T]): Reads[List[T]] =
-      (row: Row, index: Int) =>
-        (
-          row.getList(index, ev.cassType).asScala.map(ev.fromCassandra(_)).toList,
-          index + 1
-        )
-
-    implicit def setReads[T](implicit ev: CassPrimType[T]): Reads[Set[T]] =
-      (row: Row, index: Int) =>
-        (
-          row.getSet(index, ev.cassType).asScala.map(ev.fromCassandra(_)).toSet,
-          index + 1
-        )
-
-    implicit def mapReads[K, V](implicit evK: CassPrimType[K], evV: CassPrimType[V]): Reads[Map[K, V]] =
-      (row: Row, index: Int) =>
-        (
-          row
-            .getMap(index, evK.cassType, evV.cassType)
-            .asScala
-            .map { case (casK, casV) =>
-              (evK.fromCassandra(casK), evV.fromCassandra(casV))
-            }
-            .toMap,
-          index + 1
-        )
   }
 
-  trait ReadsLowPriority {
+  /**
+   * Note: We define instances for collections rather than A where A has evidence of a CassandraTypeMapper instance to
+   * prevent an implicit resolution clash with the case class parser
+   */
+  trait ReadsLowerPriority {
+    implicit def deriveSetFromCassandraTypeMapper[A](implicit ev: CassandraTypeMapper[A]): Reads[Set[A]] = {
+      (row: Row, index: Int) =>
+        val datatype     = row.getType(index).asInstanceOf[DefaultSetType].getElementType
+        val cassandraSet = row.getSet(index, ev.classType)
+        val scala        = cassandraSet.asScala.map(cas => ev.fromCassandra(cas, datatype)).toSet
+        (scala, index + 1)
+    }
+
+    implicit def deriveListFromCassandraTypeMapper[A](implicit ev: CassandraTypeMapper[A]): Reads[List[A]] = {
+      (row: Row, index: Int) =>
+        val datatype     = row.getType(index).asInstanceOf[DefaultListType].getElementType
+        val cassandraSet = row.getList(index, ev.classType)
+        val scala        = cassandraSet.asScala.map(cas => ev.fromCassandra(cas, datatype)).toList
+        (scala, index + 1)
+    }
+
+    implicit def deriveMapFromCassandraTypeMapper[K, V](implicit
+      evK: CassandraTypeMapper[K],
+      evV: CassandraTypeMapper[V]
+    ): Reads[Map[K, V]] = { (row: Row, index: Int) =>
+      val top          = row.getType(index).asInstanceOf[DefaultMapType]
+      val keyType      = top.getKeyType
+      val valueType    = top.getValueType
+      val cassandraMap = row.getMap(index, evK.classType, evV.classType)
+      val scala        =
+        cassandraMap.asScala.map { case (k, v) =>
+          (evK.fromCassandra(k, keyType), evV.fromCassandra(v, valueType))
+        }.toMap
+      (scala, index + 1)
+    }
+  }
+
+  trait ReadsLowestPriority {
     implicit val hNilParser: Reads[HNil] = (_: Row, index: Int) => (HNil, index)
 
     implicit def hConsParser[H: Reads, T <: HList: Reads]: Reads[H :: T] = (row: Row, index: Int) => {
