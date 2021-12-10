@@ -74,4 +74,15 @@ object CassandraSession {
     Resource
       .make[F, CqlSession](fromJavaAsync(builder.buildAsync()))(session => fromJavaAsync(session.closeAsync()).void)
       .map(cqlSession => new Live[F](cqlSession))
+
+  /**
+   * Create CassandraSession from an existing CqlSession.
+   * Note: the creator of the CqlSession is responsible for managing the lifecycle and this constructor is meant for interop with an existing codebase
+   *
+   * @param session is an existing CqlSession
+   * @tparam F - effect type that requires the Async capability
+   * @return CassandraSession
+   */
+  def existing[F[_]: Async](session: CqlSession): CassandraSession[F] =
+    new Live[F](session)
 }
