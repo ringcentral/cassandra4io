@@ -157,19 +157,21 @@ package object cql {
       ParameterizedQuery[V, Row](QueryTemplate[V, Row](ctx.parts.mkString("?"), identity), values)
   }
 
-  implicit class CqlStringContext(ctx: StringContext) {
-    val cqlt = new CqlTemplateStringInterpolator(ctx)
-    val cql  = new CqlStringInterpolator(ctx)
-  }
-
   /**
    * Provides a way to lift arbitrary strings into CQL so you can parameterize on values that are not valid CQL parameters
    * Please note that this is not escaped so do not use this with user-supplied input for your application (only use
    * cqlConst for input that you as the application author control)
-   * @param str
-   * @return
    */
-  def cqlConst(str: String): ParameterizedQuery[HNil, Row] = ParameterizedQuery(QueryTemplate(str, identity), HNil)
+  class CqlConstInterpolator(ctx: StringContext) {
+    def apply(args: Any*): ParameterizedQuery[HNil, Row] =
+      ParameterizedQuery(QueryTemplate(ctx.s(args: _*), identity), HNil)
+  }
+
+  implicit class CqlStringContext(ctx: StringContext) {
+    val cqlt     = new CqlTemplateStringInterpolator(ctx)
+    val cql      = new CqlStringInterpolator(ctx)
+    val cqlConst = new CqlConstInterpolator(ctx)
+  }
 
   @implicitNotFound("""Cannot find or construct a Binder instance for type:
 
