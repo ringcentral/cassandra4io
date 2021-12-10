@@ -163,23 +163,13 @@ package object cql {
   }
 
   /**
-   * Provides a way to lift arbitrary strings into SQL so you can parameterize on values that are not valid CQL parameters
-   * This variant inserts whitespace after to minimize adding whitespaces when composing. Please note that this is not
-   * escaped so do not use this with user-supplied input for your application.
-   *
+   * Provides a way to lift arbitrary strings into CQL so you can parameterize on values that are not valid CQL parameters
+   * Please note that this is not escaped so do not use this with user-supplied input for your application (only use
+   * cqlConst for input that you as the application author control)
    * @param str
    * @return
    */
-  def cqlConst(str: String): ParameterizedQuery[HNil, Row] = ParameterizedQuery(QueryTemplate(s"$str ", identity), HNil)
-
-  /**
-   * Provides a way to lift arbitrary strings into SQL so you can parameterize on values that are not valid CQL parameters
-   * This variant does not insert whitespace. Please note that this is not escaped so do not use this with user-supplied
-   * input for your application.
-   * @param str
-   * @return
-   */
-  def cqlConst0(str: String): ParameterizedQuery[HNil, Row] = ParameterizedQuery(QueryTemplate(str, identity), HNil)
+  def cqlConst(str: String): ParameterizedQuery[HNil, Row] = ParameterizedQuery(QueryTemplate(str, identity), HNil)
 
   @implicitNotFound("""Cannot find or construct a Binder instance for type:
 

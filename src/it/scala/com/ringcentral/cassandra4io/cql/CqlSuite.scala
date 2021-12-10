@@ -278,14 +278,14 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
       val keyspaceName = "cassandra4io"
       val tableName    = "person_attributes"
       val selectFrom   = cql"SELECT person_id, info FROM "
-      val keyspace     = cqlConst0(s"$keyspaceName.")
+      val keyspace     = cqlConst(s"$keyspaceName.")
       val table        = cqlConst(s"$tableName")
 
       def where(personId: Int) =
-        cql"WHERE person_id = $personId"
+        cql" WHERE person_id = $personId"
 
       def insert(personAttribute: PersonAttribute) =
-        (cql"INSERT INTO " ++ keyspace ++ table ++ cql"(person_id, info) VALUES (${data.personId}, ${data.info})")
+        (cql"INSERT INTO " ++ keyspace ++ table ++ cql" (person_id, info) VALUES (${data.personId}, ${data.info})")
           .execute(session)
 
       for {
