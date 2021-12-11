@@ -10,6 +10,7 @@ import com.datastax.oss.driver.api.core.data.UdtValue
 import com.datastax.oss.driver.internal.core.`type`.{ DefaultListType, DefaultMapType, DefaultSetType }
 import fs2.Stream
 import shapeless._
+import shapeless.ops.hlist.Prepend
 
 import java.nio.ByteBuffer
 import java.time.{ Instant, LocalDate }
@@ -23,27 +24,65 @@ package object cql {
     query: String,
     config: BoundStatement => BoundStatement
   ) {
-    def +(that: String): QueryTemplate[V, R]                                            = QueryTemplate[V, R](this.query + that, config)
-    def as[R1: Reads]: QueryTemplate[V, R1]                                             = QueryTemplate[V, R1](query, config)
+    def +(that: String): QueryTemplate[V, R] = QueryTemplate[V, R](this.query + that, config)
+
+    def ++[W <: HList, Out <: HList](that: QueryTemplate[W, R])(implicit
+      prepend: Prepend.Aux[V, W, Out],
+      binderForW: Binder[W],
+      binderForOut: Binder[Out]
+    ): QueryTemplate[Out, R] = concat(that)
+
+    def concat[W <: HList, Out <: HList](that: QueryTemplate[W, R])(implicit
+      prepend: Prepend.Aux[V, W, Out],
+      binderForW: Binder[W],
+      binderForOut: Binder[Out]
+    ): QueryTemplate[Out, R] = QueryTemplate[Out, R](
+      this.query + that.query,
+      statement => (this.config andThen that.config)(statement)
+    )
+
+    def as[R1: Reads]: QueryTemplate[V, R1] = QueryTemplate[V, R1](query, config)
+
     def prepare[F[_]: Functor](session: CassandraSession[F]): F[PreparedQuery[F, V, R]] =
       session.prepare(query).map(new PreparedQuery(session, _, config))
-    def config(config: BoundStatement => BoundStatement): QueryTemplate[V, R]           =
+
+    def config(config: BoundStatement => BoundStatement): QueryTemplate[V, R] =
       QueryTemplate[V, R](this.query, this.config andThen config)
-    def stripMargin: QueryTemplate[V, R]                                                = QueryTemplate[V, R](this.query.stripMargin, this.config)
+
+    def stripMargin: QueryTemplate[V, R] = QueryTemplate[V, R](this.query.stripMargin, this.config)
   }
 
   case class ParameterizedQuery[V <: HList: Binder, R: Reads] private (template: QueryTemplate[V, R], values: V) {
-    def +(that: String): ParameterizedQuery[V, R]                                  = ParameterizedQuery[V, R](this.template + that, this.values)
-    def as[R1: Reads]: ParameterizedQuery[V, R1]                                   = ParameterizedQuery[V, R1](template.as[R1], values)
-    def select[F[_]: Functor](session: CassandraSession[F]): Stream[F, R]          =
+    def +(that: String): ParameterizedQuery[V, R] = ParameterizedQuery[V, R](this.template + that, this.values)
+
+    def ++[W <: HList, Out <: HList](that: ParameterizedQuery[W, R])(implicit
+      prepend: Prepend.Aux[V, W, Out],
+      binderForW: Binder[W],
+      binderForOut: Binder[Out]
+    ): ParameterizedQuery[Out, R] = concat(that)
+
+    def concat[W <: HList, Out <: HList](that: ParameterizedQuery[W, R])(implicit
+      prepend: Prepend.Aux[V, W, Out],
+      binderForW: Binder[W],
+      binderForOut: Binder[Out]
+    ): ParameterizedQuery[Out, R] =
+      ParameterizedQuery[Out, R](this.template ++ that.template, prepend(this.values, that.values))
+
+    def as[R1: Reads]: ParameterizedQuery[V, R1] = ParameterizedQuery[V, R1](template.as[R1], values)
+
+    def select[F[_]: Functor](session: CassandraSession[F]): Stream[F, R] =
       Stream.force(template.prepare(session).map(_.applyProduct(values).select))
-    def selectFirst[F[_]: Monad](session: CassandraSession[F]): F[Option[R]]       =
+
+    def selectFirst[F[_]: Monad](session: CassandraSession[F]): F[Option[R]] =
       template.prepare(session).flatMap(_.applyProduct(values).selectFirst)
-    def execute[F[_]: Monad](session: CassandraSession[F]): F[Boolean]             =
+
+    def execute[F[_]: Monad](session: CassandraSession[F]): F[Boolean] =
       template.prepare(session).map(_.applyProduct(values)).flatMap(_.execute)
+
     def config(config: BoundStatement => BoundStatement): ParameterizedQuery[V, R] =
       ParameterizedQuery[V, R](template.config(config), values)
-    def stripMargin: ParameterizedQuery[V, R]                                      = ParameterizedQuery[V, R](this.template.stripMargin, values)
+
+    def stripMargin: ParameterizedQuery[V, R] = ParameterizedQuery[V, R](this.template.stripMargin, values)
   }
 
   class PreparedQuery[F[_]: Functor, V <: HList: Binder, R: Reads] private[cql] (
@@ -118,9 +157,20 @@ package object cql {
       ParameterizedQuery[V, Row](QueryTemplate[V, Row](ctx.parts.mkString("?"), identity), values)
   }
 
+  /**
+   * Provides a way to lift arbitrary strings into CQL so you can parameterize on values that are not valid CQL parameters
+   * Please note that this is not escaped so do not use this with user-supplied input for your application (only use
+   * cqlConst for input that you as the application author control)
+   */
+  class CqlConstInterpolator(ctx: StringContext) {
+    def apply(args: Any*): ParameterizedQuery[HNil, Row] =
+      ParameterizedQuery(QueryTemplate(ctx.s(args: _*), identity), HNil)
+  }
+
   implicit class CqlStringContext(ctx: StringContext) {
-    val cqlt = new CqlTemplateStringInterpolator(ctx)
-    val cql  = new CqlStringInterpolator(ctx)
+    val cqlt     = new CqlTemplateStringInterpolator(ctx)
+    val cql      = new CqlStringInterpolator(ctx)
+    val cqlConst = new CqlConstInterpolator(ctx)
   }
 
   @implicitNotFound("""Cannot find or construct a Binder instance for type:

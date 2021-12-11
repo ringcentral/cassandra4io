@@ -1,7 +1,6 @@
 package com.ringcentral.cassandra4io.cql
 
 import com.datastax.oss.driver.api.core.ConsistencyLevel
-import com.datastax.oss.driver.api.core.data.UdtValue
 import com.ringcentral.cassandra4io.CassandraTestsSharedInstances
 import fs2.Stream
 import weaver._
@@ -273,4 +272,24 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
     } yield expect(result == Seq("one"))
   }
 
+  test("cqlConst allows you to interpolate on what is usually not possible with cql strings") { session =>
+    val data         = PersonAttribute(2, BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
+    val keyspaceName = "cassandra4io"
+    val tableName    = "person_attributes"
+    val selectFrom   = cql"SELECT person_id, info FROM "
+    val keyspace     = cqlConst"$keyspaceName."
+    val table        = cqlConst"$tableName"
+
+    def where(personId: Int) =
+      cql" WHERE person_id = $personId"
+
+    def insert(data: PersonAttribute) =
+      (cql"INSERT INTO " ++ keyspace ++ table ++ cql" (person_id, info) VALUES (${data.personId}, ${data.info})")
+        .execute(session)
+
+    for {
+      _      <- insert(data)
+      result <- (selectFrom ++ keyspace ++ table ++ where(data.personId)).as[PersonAttribute].selectFirst(session)
+    } yield expect(result.isDefined && result.get == data)
+  }
 }

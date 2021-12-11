@@ -21,7 +21,7 @@ Cassandra4io is currently available for Scala 2.13 and 2.12.
 
 ### Add a dependency to your project
 ```scala
-libraryDependencies += ("com.ringcentral" %% "cassandra4io" % "0.1.6")
+libraryDependencies += ("com.ringcentral" %% "cassandra4io" % "0.1.9")
 ```
 
 ### Create a connection to Cassandra
@@ -195,6 +195,28 @@ object BasicInfo {
 
 Please note that we recommend using `FromUdtValue` and `ToUdtValue` to automatically derive this hand-written (and error-prone) 
 code. 
+
+## Interpolating on CQL parameters
+
+Cassandra4IO Allows you to interpolate (i.e. using string interpolation) on values that are not valid CQL parameters using 
+`++` or `concat` to build out your CQL query. For example, you can interpolate on the keyspace and table name using 
+the `cqlConst` interpolator like so:
+
+```scala
+val session: CassandraSession[IO] = ???
+val keyspaceName = "cassandra4io"
+val tableName    = "person_attributes"
+val keyspace     = cqlConst"$keyspaceName."
+val table        = cqlConst"$tableName"
+
+def insert(data: PersonAttribute) = 
+  (cql"INSERT INTO " ++ keyspace ++ table ++ cql" (person_id, info) VALUES (${data.personId}, ${data.info})")
+    .execute(session)
+```
+
+This allows you (the author of the application) to feed in parameters like the table name and keyspace through 
+configuration. Please be aware that you should not be taking your user's input and feeding this into `cqlConst` as 
+this will pose an injection risk.
 
 ## References
 - [Datastax Java driver](https://docs.datastax.com/en/developer/java-driver/4.9)
