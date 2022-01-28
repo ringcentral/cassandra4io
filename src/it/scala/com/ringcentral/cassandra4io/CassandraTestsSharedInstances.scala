@@ -16,7 +16,7 @@ import scala.io.BufferedSource
 trait CassandraTestsSharedInstances { self: IOSuite =>
 
   val keyspace  = "cassandra4io"
-  val container = CassandraContainer(DockerImageName.parse("cassandra:3.11.8"))
+  val container = CassandraContainer(DockerImageName.parse("cassandra:3.11.11"))
 
   def migrateSession(session: CassandraSession[IO]): IO[Unit] = {
     val migrationSource = IO.blocking(scala.io.Source.fromResource("migration/1__test_tables.cql"))

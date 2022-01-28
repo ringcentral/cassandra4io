@@ -1,5 +1,7 @@
 package com.ringcentral.cassandra4io.cql
 
+import cats.effect.IO
+import cats.syntax.parallel._
 import com.datastax.oss.driver.api.core.ConsistencyLevel
 import com.ringcentral.cassandra4io.CassandraTestsSharedInstances
 import fs2.Stream
@@ -20,11 +22,16 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
 
   case class PersonAttribute(personId: Int, info: BasicInfo)
 
-  case class CollectionTestRow(id: Int, maptest: Map[String, UUID], settest: Set[Int], listtest: List[LocalDate])
+  case class CollectionTestRow(
+    id: Int,
+    maptest: Map[String, UUID],
+    settest: Set[Int],
+    listtest: Option[List[LocalDate]]
+  )
 
-  case class ExampleType(x: Long, y: Long, date: LocalDate, time: LocalTime)
+  case class ExampleType(x: Long, y: Long, date: LocalDate, time: Option[LocalTime])
 
-  case class ExampleNestedType(a: Int, b: String, c: ExampleType)
+  case class ExampleNestedType(a: Int, b: String, c: Option[ExampleType])
 
   case class ExampleCollectionNestedUdtType(a: Int, b: Map[Int, Set[Set[Set[Set[ExampleNestedType]]]]])
   object ExampleCollectionNestedUdtType {
@@ -168,23 +175,27 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
   }
 
   test("interpolated inserts and selects should handle cassandra collections") { session =>
-    val data = CollectionTestRow(1, Map("2" -> UUID.randomUUID()), Set(1, 2, 3), List(LocalDate.now()))
+    val dataRow1 = CollectionTestRow(1, Map("2" -> UUID.randomUUID()), Set(1, 2, 3), Option(List(LocalDate.now())))
+    val dataRow2 = CollectionTestRow(2, Map("3" -> UUID.randomUUID()), Set(4, 5, 6), None)
 
-    val insert =
+    def insert(data: CollectionTestRow): IO[Boolean] =
       cql"INSERT INTO cassandra4io.test_collection (id, maptest, settest, listtest) VALUES (${data.id}, ${data.maptest}, ${data.settest}, ${data.listtest})"
         .execute(session)
 
-    val retrieve =
-      cql"SELECT id, maptest, settest, listtest FROM cassandra4io.test_collection WHERE id = ${data.id}"
+    def retrieve(id: Int, ids: Int*): IO[List[CollectionTestRow]] = {
+      val allIds = id :: ids.toList
+      cql"SELECT id, maptest, settest, listtest FROM cassandra4io.test_collection WHERE id IN $allIds"
         .as[CollectionTestRow]
         .select(session)
         .compile
         .toList
+    }
 
     for {
-      _      <- insert
-      result <- retrieve
-    } yield expect(result.length == 1 && result.head == data)
+      _    <- List(dataRow1, dataRow2).parTraverse(insert)
+      res1 <- retrieve(dataRow1.id)
+      res2 <- retrieve(dataRow2.id)
+    } yield expect(res1.length == 1 && res1.head == dataRow1) and expect(res2.length == 1 && res2.head == dataRow2)
   }
 
   test("interpolated inserts and selects should handle nested UDTs in heavily nested collections") { session =>
@@ -200,7 +211,7 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
                   ExampleNestedType(
                     a = 3,
                     b = "4",
-                    c = ExampleType(x = 5L, y = 6L, date = LocalDate.now(), time = LocalTime.now())
+                    c = Option(ExampleType(x = 5L, y = 6L, date = LocalDate.now(), time = Option(LocalTime.now())))
                   )
                 )
               )
@@ -213,7 +224,20 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
                   ExampleNestedType(
                     a = 10,
                     b = "100",
-                    c = ExampleType(x = 105L, y = 106L, date = LocalDate.now(), time = LocalTime.now())
+                    c = Option(ExampleType(x = 105L, y = 106L, date = LocalDate.now(), time = None))
+                  )
+                )
+              )
+            )
+          ),
+          3 -> Set(
+            Set(
+              Set(
+                Set(
+                  ExampleNestedType(
+                    a = 24,
+                    b = "101",
+                    c = None
                   )
                 )
               )
