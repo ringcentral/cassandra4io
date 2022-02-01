@@ -154,8 +154,13 @@ package object cql {
     }
   }
 
+  /**
+   * BoundValue is used to capture the value inside the cql interpolated string along with evidence of its Binder so that
+   * a ParameterizedQuery can be built and the values can be bound to the BoundStatement internally
+   */
   private[cql] final case class BoundValue[A](value: A, ev: Binder[A])
   object BoundValue {
+    // This implicit conversion automatically captures the value and evidence of the Binder in a cql interpolated string
     implicit def aToBoundValue[A](a: A)(implicit ev: Binder[A]): BoundValue[A] =
       BoundValue(a, ev)
   }
@@ -167,31 +172,22 @@ package object cql {
       expressions: Iterator[BoundValue[_]],
       acc: String
     ): String =
-      (strings.nextOption(), expressions.nextOption()) match {
-        case (Some(str), Some(v)) =>
-          replaceValuesWithQuestionMark(
-            strings = strings,
-            expressions = expressions,
-            acc = acc + s"$str?"
-          )
-
-        case (Some(str), None) =>
-          replaceValuesWithQuestionMark(
-            strings = strings,
-            expressions = expressions,
-            acc + str
-          )
-
-        case (None, Some(v)) =>
-          replaceValuesWithQuestionMark(
-            strings = strings,
-            expressions = expressions,
-            acc
-          )
-
-        case (None, None) =>
-          acc
-      }
+      if (strings.hasNext && expressions.hasNext) {
+        val str = strings.next()
+        val _   = expressions.next()
+        replaceValuesWithQuestionMark(
+          strings = strings,
+          expressions = expressions,
+          acc = acc + s"$str?"
+        )
+      } else if (strings.hasNext && !expressions.hasNext) {
+        val str = strings.next()
+        replaceValuesWithQuestionMark(
+          strings = strings,
+          expressions = expressions,
+          acc + str
+        )
+      } else acc
 
     def apply(values: BoundValue[_]*): SimpleQuery[Row] = {
       val queryWithQuestionMark = replaceValuesWithQuestionMark(ctx.parts.iterator, values.iterator, "")
