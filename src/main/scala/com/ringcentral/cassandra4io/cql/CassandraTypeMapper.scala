@@ -7,6 +7,7 @@ import shapeless.Lazy
 
 import java.nio.ByteBuffer
 import java.time.LocalDate
+import java.util.Optional
 import scala.jdk.CollectionConverters._
 
 /**
@@ -227,5 +228,24 @@ object CassandraTypeMapper       {
           (kEv.fromCassandra(kC, keyDataType), vEv.fromCassandra(vC, valueDataType))
         }.toMap
       }
+    }
+
+  implicit def optionCassandraTypeMapper[A, Cass](implicit
+    ev: CassandraTypeMapper.WithCassandra[A, Cass]
+  ): CassandraTypeMapper.WithCassandra[Option[A], Cass] =
+    new CassandraTypeMapper[Option[A]] {
+      override type Cassandra = Cass
+
+      override def classType: Class[Cassandra] = ev.classType
+
+      // NOTE: This is safe to do as the underlying Datastax driver allows you to use null values to represent the absence of data
+      override def toCassandra(in: Option[A], dataType: DataType): Cassandra =
+        in.map(ev.toCassandra(_, dataType)) match {
+          case Some(value) => value
+          case None        => null.asInstanceOf[Cassandra]
+        }
+
+      override def fromCassandra(in: Cassandra, dataType: DataType): Option[A] =
+        Option(in).map(ev.fromCassandra(_, dataType))
     }
 }
