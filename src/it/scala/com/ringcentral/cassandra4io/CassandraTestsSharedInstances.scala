@@ -70,4 +70,7 @@ trait CassandraTestsSharedInstances { self: IOSuite =>
       .mkString("")
     s1.split(';').toList.map(_.strip())
   }
+
+  def getError[T](either: Either[Throwable, T]): Throwable =
+    either.swap.getOrElse(new RuntimeException("Either is right defined"))
 }

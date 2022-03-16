@@ -7,7 +7,7 @@ import com.ringcentral.cassandra4io.CassandraTestsSharedInstances
 import fs2.Stream
 import weaver._
 
-import java.time.{ Duration, LocalDate, LocalTime }
+import java.time.{Duration, LocalDate, LocalTime}
 import java.util.UUID
 
 trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
@@ -315,5 +315,18 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
       _      <- insert(data)
       result <- (selectFrom ++ keyspace ++ table ++ where(data.personId)).as[PersonAttribute].selectFirst(session)
     } yield expect(result.isDefined && result.get == data)
+  }
+
+  // handle NULL values
+  test("return None if a type is Option") { session =>
+    for {
+      result  <- cql"select data FROM cassandra4io.test_data WHERE id = 0".as[Option[String]].selectFirst(session)
+    } yield expect(result.isDefined && result.get.isEmpty)
+  }
+
+  test("raise error if a type is not an Option") { session =>
+    for {
+      result  <- cql"select data FROM cassandra4io.test_data WHERE id = 0".as[String].selectFirst(session).attempt
+    } yield expect(result.isLeft)
   }
 }
