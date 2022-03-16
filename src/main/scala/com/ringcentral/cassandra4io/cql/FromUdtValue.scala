@@ -21,7 +21,11 @@ object FromUdtValue extends LowerPriorityFromUdtValue with LowestPriorityFromUdt
 
   def deriveReads[A](implicit ev: FromUdtValue.Object[A]): Reads[A] = (row: Row, index: Int) => {
     val udtValue = row.getUdtValue(index)
-    ev.convert(FieldName.Unused, udtValue)
+    try ev.convert(FieldName.Unused, udtValue)
+    catch {
+      case UnexpectedNullValueInUdt.NullValueInUdt(udtValue, fieldName) =>
+        throw new UnexpectedNullValueInUdt(row, index, udtValue, fieldName)
+    }
   }
 
   // only allowed to summon fully built out FromUdtValue instances which are built by Shapeless machinery
@@ -68,7 +72,12 @@ trait LowerPriorityFromUdtValue {
     ev: CassandraTypeMapper[A]
   ): FromUdtValue[A] =
     makeWithFieldName[A] { (fieldName, udtValue) =>
-      ev.fromCassandra(udtValue.get(fieldName, ev.classType), udtValue.getType(fieldName))
+      val scala = ev.fromCassandra(udtValue.get(fieldName, ev.classType), udtValue.getType(fieldName))
+      // we have type mapper for Option types, so we should never get null here
+      if (scala == null) {
+        throw UnexpectedNullValueInUdt.NullValueInUdt(udtValue, fieldName)
+      } else
+        scala
     }
 }
 

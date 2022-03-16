@@ -15,7 +15,7 @@ trait Reads[T] { self =>
 
   def read(row: Row, index: Int): T =
     if (row.isNull(index)) {
-      throw new UnexpectedNullValue(row, index)
+      throw new UnexpectedNullValueInColumn(row, index)
     } else {
       readNullable(row, index)
     }
@@ -23,19 +23,6 @@ trait Reads[T] { self =>
   def nextIndex(index: Int): Int = index + 1
 
   def map[U](f: T => U): Reads[U] = (row: Row, index: Int) => f(self.read(row, index))
-}
-
-class UnexpectedNullValue(row: Row, index: Int) extends RuntimeException() {
-  override def getMessage: String = {
-    val cl       = row.getColumnDefinitions.get(index)
-    val table    = cl.getTable.toString
-    val column   = cl.getName.toString
-    val keyspace = cl.getKeyspace.toString
-    val tpe      = cl.getType.asCql(true, true)
-
-    s"Read NULL value from $keyspace.$table column $column expected $tpe. Row ${row.getFormattedContents}"
-  }
-
 }
 
 object Reads extends ReadsLowerPriority with ReadsLowestPriority {

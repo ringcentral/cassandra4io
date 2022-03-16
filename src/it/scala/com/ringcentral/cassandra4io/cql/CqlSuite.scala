@@ -9,6 +9,7 @@ import weaver._
 
 import java.time.{ Duration, LocalDate, LocalTime }
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 
 trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
 
@@ -22,6 +23,18 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
   }
 
   case class PersonAttribute(personId: Int, info: BasicInfo)
+  object PersonAttribute {
+    val idxCounter = new AtomicInteger(0)
+  }
+  case class PersonAttributeOpt(personId: Int, info: Option[BasicInfo])
+
+  case class OptBasicInfo(weight: Option[Double], height: Option[String], datapoints: Option[Set[Int]])
+  object OptBasicInfo {
+    implicit val cqlReads: Reads[OptBasicInfo]   = FromUdtValue.deriveReads[OptBasicInfo]
+    implicit val cqlBinder: Binder[OptBasicInfo] = ToUdtValue.deriveBinder[OptBasicInfo]
+  }
+
+  case class PersonAttributeUdtOpt(personId: Int, info: OptBasicInfo)
 
   case class CollectionTestRow(
     id: Int,
@@ -158,7 +171,8 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
   test(
     "interpolated inserts and selects should produce UDTs and return data case classes when nested case classes are used"
   ) { session =>
-    val data   = PersonAttribute(1, BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
+    val data   =
+      PersonAttribute(PersonAttribute.idxCounter.incrementAndGet(), BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
     val insert =
       cql"INSERT INTO cassandra4io.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
         .execute(session)
@@ -298,7 +312,8 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
   }
 
   test("cqlConst allows you to interpolate on what is usually not possible with cql strings") { session =>
-    val data         = PersonAttribute(2, BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
+    val data         =
+      PersonAttribute(PersonAttribute.idxCounter.incrementAndGet(), BasicInfo(180.0, "tall", Set(1, 2, 3, 4, 5)))
     val keyspaceName = "cassandra4io"
     val tableName    = "person_attributes"
     val selectFrom   = cql"SELECT person_id, info FROM "
@@ -346,4 +361,68 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
       result <- cql"select id, data FROM cassandra4io.test_data WHERE id = 0".as[Data].selectFirst(session).attempt
     } yield expect(result.isLeft) && expect(getError(result).isInstanceOf[UnexpectedNullValue])
   }
+
+  // handle NULL values for udt columns
+
+  test("allow null for direct Option type for udt column") { session =>
+    val data = PersonAttributeOpt(PersonAttribute.idxCounter.incrementAndGet(), None)
+
+    for {
+      _      <- cql"INSERT INTO cassandra4io.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+                  .execute(session)
+      result <- cql"SELECT person_id, info FROM cassandra4io.person_attributes WHERE person_id = ${data.personId}"
+                  .as[PersonAttributeOpt]
+                  .select(session)
+                  .compile
+                  .toList
+    } yield expect(result.length == 1 && result.head == data)
+  }
+
+  test("raise error if null is mapped to non Option type for udt column") { session =>
+    val data = PersonAttributeOpt(PersonAttribute.idxCounter.incrementAndGet(), None)
+
+    for {
+      _      <- cql"INSERT INTO cassandra4io.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+                  .execute(session)
+      result <- cql"SELECT person_id, info FROM cassandra4io.person_attributes WHERE person_id = ${data.personId}"
+                  .as[PersonAttribute]
+                  .selectFirst(session)
+                  .attempt
+    } yield expect(result.isLeft) && expect(getError(result).isInstanceOf[UnexpectedNullValue])
+  }
+
+  // handle NULL inside udt
+
+  test("allow null for direct Option type for udt field") { session =>
+    val data = PersonAttributeUdtOpt(
+      PersonAttribute.idxCounter.incrementAndGet(),
+      OptBasicInfo(Some(160.0), None, Some(Set(1)))
+    )
+
+    for {
+      _      <- cql"INSERT INTO cassandra4io.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+                  .execute(session)
+      result <- cql"SELECT person_id, info FROM cassandra4io.person_attributes WHERE person_id = ${data.personId}"
+                  .as[PersonAttributeUdtOpt]
+                  .selectFirst(session)
+    } yield expect(result.contains(data))
+  }
+
+  test("raise error if null is mapped to non Option type for udt field") { session =>
+    val data =
+      PersonAttributeUdtOpt(
+        PersonAttribute.idxCounter.incrementAndGet(),
+        OptBasicInfo(Some(160.0), None, Some(Set(1)))
+      )
+
+    for {
+      _      <- cql"INSERT INTO cassandra4io.person_attributes (person_id, info) VALUES (${data.personId}, ${data.info})"
+                  .execute(session)
+      result <- cql"SELECT person_id, info FROM cassandra4io.person_attributes WHERE person_id = ${data.personId}"
+                  .as[PersonAttribute]
+                  .selectFirst(session)
+                  .attempt
+    } yield expect(result.isLeft) && expect(getError(result).isInstanceOf[UnexpectedNullValue])
+  }
+
 }
