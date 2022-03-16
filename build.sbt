@@ -25,16 +25,17 @@ lazy val root = (project in file("."))
   .configs(IntegrationTest)
   .settings(
     Defaults.itSettings,
+    IntegrationTest / fork := true,
     libraryDependencies ++= Seq(
       "org.typelevel"       %% "cats-effect"                    % "3.3.5",
-      "co.fs2"              %% "fs2-core"                       % "3.2.4",
-      "com.datastax.oss"     % "java-driver-core"               % "4.13.0",
-      "com.chuusai"         %% "shapeless"                      % "2.3.7"
+      "co.fs2"              %% "fs2-core"                       % "3.2.5",
+      "com.datastax.oss"     % "java-driver-core"               % "4.14.0",
+      "com.chuusai"         %% "shapeless"                      % "2.3.8"
     ) ++ Seq(
-      "com.disneystreaming" %% "weaver-cats"                    % "0.7.6"  % "it,test",
+      "com.disneystreaming" %% "weaver-cats"                    % "0.7.10"  % "it,test",
       "org.testcontainers"   % "testcontainers"                 % "1.16.3" % "it",
-      "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.40.0" % "it",
-      "ch.qos.logback"       % "logback-classic"                % "1.2.10" % "it,test"
+      "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.40.2" % "it",
+      "ch.qos.logback"       % "logback-classic"                % "1.2.11" % "it,test"
     ) ++ (scalaBinaryVersion.value match {
       case v if v.startsWith("2.13") =>
         Seq.empty
@@ -84,4 +85,4 @@ Compile / compile / scalacOptions ++= Seq(
     case other                     => sys.error(s"Unsupported scala version: $other")
   })
 
-testFrameworks += new TestFramework("weaver.framework.CatsEffect")
+testFrameworks := Seq(new TestFramework("weaver.framework.CatsEffect"))
