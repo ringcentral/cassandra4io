@@ -7,12 +7,13 @@ import com.ringcentral.cassandra4io.CassandraTestsSharedInstances
 import fs2.Stream
 import weaver._
 
-import java.time.{Duration, LocalDate, LocalTime}
+import java.time.{ Duration, LocalDate, LocalTime }
 import java.util.UUID
 
 trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
 
   case class Data(id: Long, data: String)
+  case class OptData(id: Long, data: Option[String])
 
   case class BasicInfo(weight: Double, height: String, datapoints: Set[Int])
   object BasicInfo {
@@ -318,15 +319,31 @@ trait CqlSuite { self: IOSuite with CassandraTestsSharedInstances =>
   }
 
   // handle NULL values
-  test("return None if a type is Option") { session =>
+  test("allow null for direct Option type") { session =>
     for {
-      result  <- cql"select data FROM cassandra4io.test_data WHERE id = 0".as[Option[String]].selectFirst(session)
+      result <- cql"select data FROM cassandra4io.test_data WHERE id = 0".as[Option[String]].selectFirst(session)
     } yield expect(result.isDefined && result.get.isEmpty)
   }
 
-  test("raise error if a type is not an Option") { session =>
+  test("raise error if null is mapped to non Option type") { session =>
     for {
-      result  <- cql"select data FROM cassandra4io.test_data WHERE id = 0".as[String].selectFirst(session).attempt
-    } yield expect(result.isLeft)
+      result       <- cql"select data FROM cassandra4io.test_data WHERE id = 0".as[String].selectFirst(session).attempt
+      resultStream <-
+        cql"select data FROM cassandra4io.test_data WHERE id = 0".as[String].select(session).compile.toList.attempt
+    } yield expect(result.isLeft) && expect(getError(result).isInstanceOf[UnexpectedNullValue]) && expect(
+      resultStream.isLeft
+    ) && expect(getError(resultStream).isInstanceOf[UnexpectedNullValue])
+  }
+
+  test("allow null for direct Option type in case class") { session =>
+    for {
+      row <- cql"select id, data FROM cassandra4io.test_data WHERE id = 0".as[OptData].selectFirst(session)
+    } yield expect(row.isDefined && row.get.data.isEmpty)
+  }
+
+  test("raise error if null is mapped to non Option type in case cllass") { session =>
+    for {
+      result <- cql"select id, data FROM cassandra4io.test_data WHERE id = 0".as[Data].selectFirst(session).attempt
+    } yield expect(result.isLeft) && expect(getError(result).isInstanceOf[UnexpectedNullValue])
   }
 }

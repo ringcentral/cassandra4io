@@ -100,8 +100,8 @@ package object cql {
     private[cql] val statement: BoundStatement
   ) {
     def config(statement: BoundStatement => BoundStatement) = new Query[F, R](session, statement(this.statement))
-    def select: Stream[F, R]                                = session.select(statement).map(Reads[R].read(_, 0)._1)
-    def selectFirst: F[Option[R]]                           = OptionT(session.selectFirst(statement)).map(Reads[R].read(_, 0)._1).value
+    def select: Stream[F, R]                                = session.select(statement).map(Reads[R].read(_, 0))
+    def selectFirst: F[Option[R]]                           = OptionT(session.selectFirst(statement)).map(Reads[R].read(_, 0)).value
     def execute: F[Boolean]                                 = session.execute(statement).map(_.wasApplied)
   }
 

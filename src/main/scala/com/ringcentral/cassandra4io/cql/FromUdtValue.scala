@@ -21,7 +21,7 @@ object FromUdtValue extends LowerPriorityFromUdtValue with LowestPriorityFromUdt
 
   def deriveReads[A](implicit ev: FromUdtValue.Object[A]): Reads[A] = (row: Row, index: Int) => {
     val udtValue = row.getUdtValue(index)
-    (ev.convert(FieldName.Unused, udtValue), index + 1)
+    ev.convert(FieldName.Unused, udtValue)
   }
 
   // only allowed to summon fully built out FromUdtValue instances which are built by Shapeless machinery
