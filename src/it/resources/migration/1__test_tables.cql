@@ -1,12 +1,14 @@
 create table test_data(
     id bigint,
     data text,
+    count int,
+    dataset frozen<set<int>>,
     PRIMARY KEY (id)
 );
 
-insert into test_data (id, data) values (0, null);
-insert into test_data (id, data) values (1, 'one');
-insert into test_data (id, data) values (2, 'two');
+insert into test_data (id, data, count, dataset) values (0, null, null, null);
+insert into test_data (id, data, count, dataset) values (1, 'one', 10, {});
+insert into test_data (id, data, count, dataset) values (2, 'two', 20, {201});
 insert into test_data (id, data) values (3, 'three');
 
 create table test_data_multiple_keys(

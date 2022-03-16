@@ -72,12 +72,12 @@ trait LowerPriorityFromUdtValue {
     ev: CassandraTypeMapper[A]
   ): FromUdtValue[A] =
     makeWithFieldName[A] { (fieldName, udtValue) =>
-      val scala = ev.fromCassandra(udtValue.get(fieldName, ev.classType), udtValue.getType(fieldName))
-      // we have type mapper for Option types, so we should never get null here
-      if (scala == null) {
-        throw UnexpectedNullValueInUdt.NullValueInUdt(udtValue, fieldName)
+      if (udtValue.isNull(fieldName)) {
+        if (ev.allowNullable)
+          None.asInstanceOf[A]
+        else throw UnexpectedNullValueInUdt.NullValueInUdt(udtValue, fieldName)
       } else
-        scala
+        ev.fromCassandra(udtValue.get(fieldName, ev.classType), udtValue.getType(fieldName))
     }
 }
 

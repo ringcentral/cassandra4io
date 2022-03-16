@@ -22,6 +22,7 @@ trait CassandraTypeMapper[Scala] {
   def classType: Class[Cassandra]
   def toCassandra(in: Scala, dataType: DataType): Cassandra
   def fromCassandra(in: Cassandra, dataType: DataType): Scala
+  def allowNullable: Boolean = false
 }
 object CassandraTypeMapper       {
   type WithCassandra[Sc, Cas] = CassandraTypeMapper[Sc] { type Cassandra = Cas }
@@ -234,6 +235,7 @@ object CassandraTypeMapper       {
     ev: CassandraTypeMapper.WithCassandra[A, Cass]
   ): CassandraTypeMapper.WithCassandra[Option[A], Cass] =
     new CassandraTypeMapper[Option[A]] {
+      override def allowNullable: Boolean = true
       override type Cassandra = Cass
 
       override def classType: Class[Cassandra] = ev.classType

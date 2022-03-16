@@ -11,9 +11,13 @@ import org.testcontainers.utility.DockerImageName
 import weaver.IOSuite
 
 import java.net.InetSocketAddress
+import java.time.Duration
 import scala.io.BufferedSource
+import org.slf4j.LoggerFactory
 
 trait CassandraTestsSharedInstances { self: IOSuite =>
+
+  val logger = LoggerFactory.getLogger(self.getClass)
 
   val keyspace  = "cassandra4io"
   val container = CassandraContainer(DockerImageName.parse("cassandra:3.11.11"))
@@ -24,10 +28,16 @@ trait CassandraTestsSharedInstances { self: IOSuite =>
       _         <- session.execute(s"use $keyspace")
       source    <- migrationSource
       migrations = splitToMigrations(source)
+      _         <- IO(logger.info("start cassandra migration for tests"))
       _         <- migrations.toList.traverse_ { migration =>
-                     val st = SimpleStatement.newInstance(migration)
-                     session.execute(st)
+                     val st = SimpleStatement.newInstance(migration).setTimeout(Duration.ofSeconds(4))
+                     session.execute(st).onError { error =>
+                       IO {
+                         logger.error(s"Error in execution migration $migration", error)
+                       }
+                     }
                    }
+      _         <- IO(logger.info("cassandra migration done"))
     } yield ()
   }
 
