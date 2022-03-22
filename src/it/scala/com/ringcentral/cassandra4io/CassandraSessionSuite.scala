@@ -10,9 +10,6 @@ import weaver._
 
 trait CassandraSessionSuite { self: IOSuite with CassandraTestsSharedInstances =>
 
-  private def getError[T](either: Either[Throwable, T]): Throwable =
-    either.swap.getOrElse(new RuntimeException("Either is right defined"))
-
   implicit def toStatement(s: String): SimpleStatement = SimpleStatement.newInstance(s)
 
   test("CassandraSession.connect be referentially transparent") { _ =>
