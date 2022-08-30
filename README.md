@@ -21,7 +21,7 @@ Cassandra4io is currently available for Scala 2.13 and 2.12.
 
 ### Add a dependency to your project
 ```scala
-libraryDependencies += ("com.ringcentral" %% "cassandra4io" % "0.1.9")
+libraryDependencies += ("com.ringcentral" %% "cassandra4io" % "0.1.13")
 ```
 
 ### Create a connection to Cassandra
