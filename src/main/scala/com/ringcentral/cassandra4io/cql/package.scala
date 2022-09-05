@@ -158,7 +158,7 @@ package object cql {
    * BoundValue is used to capture the value inside the cql interpolated string along with evidence of its Binder so that
    * a ParameterizedQuery can be built and the values can be bound to the BoundStatement internally
    */
-  private[cql] final case class BoundValue[A](value: A, ev: Binder[A])
+  final case class BoundValue[A](value: A, ev: Binder[A])
   object BoundValue {
     // This implicit conversion automatically captures the value and evidence of the Binder in a cql interpolated string
     implicit def aToBoundValue[A](a: A)(implicit ev: Binder[A]): BoundValue[A] =
@@ -214,10 +214,15 @@ package object cql {
       ParameterizedQuery(QueryTemplate(ctx.s(args: _*), identity), HNil)
   }
 
-  implicit class CqlStringContext(ctx: StringContext) {
-    val cqlt     = new CqlTemplateStringInterpolator(ctx)
-    val cql      = new CqlStringInterpolator(ctx)
-    val cqlConst = new CqlConstInterpolator(ctx)
+  implicit class CqlStringContext(val ctx: StringContext) extends AnyVal {
+    def cqlt     = new CqlTemplateStringInterpolator(ctx)
+    def cql      = new CqlStringInterpolator(ctx)
+    def cqlConst = new CqlConstInterpolator(ctx)
+  }
+
+  implicit class UnsetOptionValueOps[A](self: Option[A]) {
+    def usingUnset(implicit aBinder: Binder[A]): BoundValue[Option[A]] =
+      BoundValue(self, Binder.optionUsingUnsetBinder[A])
   }
 
   @implicitNotFound("""Cannot find or construct a Binder instance for type:
@@ -307,11 +312,21 @@ package object cql {
     implicit val userDefinedTypeValueBinder: Binder[UdtValue] =
       (statement: BoundStatement, index: Int, value: UdtValue) => (statement.setUdtValue(index, value), index + 1)
 
-    implicit def optionBinder[T: Binder]: Binder[Option[T]] = new Binder[Option[T]] {
+    private def commonOptionBinder[T: Binder](
+      bindNone: (BoundStatement, Int) => BoundStatement
+    ): Binder[Option[T]] = new Binder[Option[T]] {
       override def bind(statement: BoundStatement, index: Int, value: Option[T]): (BoundStatement, Int) = value match {
         case Some(x) => Binder[T].bind(statement, index, x)
-        case None    => (statement.unset(index), index + 1)
+        case None => (bindNone(statement, index), index + 1)
       }
+    }
+
+    implicit def optionBinder[T: Binder]: Binder[Option[T]] = commonOptionBinder[T] { (statement, index) =>
+      statement.setToNull(index)
+    }
+
+    def optionUsingUnsetBinder[T: Binder]: Binder[Option[T]] = commonOptionBinder[T] { (statement, index) =>
+      statement.unset(index)
     }
 
     implicit def widenBinder[T: Binder, X <: T](implicit wd: Widen.Aux[X, T]): Binder[X] = new Binder[X] {
