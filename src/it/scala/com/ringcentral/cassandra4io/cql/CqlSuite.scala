@@ -400,13 +400,6 @@ trait CqlSuite {
     } yield expect(result.isRight) && expect(result.contains(true))
   }
 
-  test("nullable field should be correctly encoded in updates' where condition") { session =>
-    val value: Option[Int] = None
-    for {
-      result <- cql"update cassandra4io.test_data set count = 30 where id = $value".execute(session).attempt
-    } yield expect(result.isRight) && expect(result.contains(true))
-  }
-
   test("nullable fields should be correctly set with 'usingUnset'") { session =>
     case class TestData(id: Long, data: Option[String], count: Option[Int])
     val id = 111L
