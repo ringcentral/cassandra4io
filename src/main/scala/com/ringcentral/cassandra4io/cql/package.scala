@@ -220,7 +220,7 @@ package object cql {
     def cqlConst = new CqlConstInterpolator(ctx)
   }
 
-  implicit class UnsetOptionValueOps[A](self: Option[A]) {
+  implicit class UnsetOptionValueOps[A](val self: Option[A]) extends AnyVal {
     def usingUnset(implicit aBinder: Binder[A]): BoundValue[Option[A]] =
       BoundValue(self, Binder.optionUsingUnsetBinder[A])
   }
