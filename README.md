@@ -113,6 +113,17 @@ object Dao {
 } 
 ```
 
+### Handling optional fields (`null`)
+
+By default, cassandra4io encodes `Option` as a `null` value. Which is ok for most cases. But in Cassandra, there is a difference between a `null` value and an empty value. In java driver this difference is represented by `BoundStatement#setToNull` (default behavior) and `BoundStatement#unset` (setting an empty field). The main advantage of using `unset` instead of `setToNull` is that tombstone will not be created for an empty field.
+
+To use the `unset` instead of the `setToNull` for your optional value in a `cql` interpolators you could add `.usingUnset` to your optional value. Like in the following example:
+```scala
+import com.ringcentral.cassandra4io.cql._
+
+cql"insert into entities(foo, bar, baz) values (${e.foo}, ${e.bar}, ${e.baz.usingUnset}"
+```
+
 ## User Defined Type (UDT) support
 
 Cassandra4IO provides support for Cassandra's User Defined Type (UDT) values. 
