@@ -1,6 +1,7 @@
 # Cassandra 4 io
 
 ![CI](https://github.com/ringcentral/cassandra4io/workflows/CI/badge.svg?branch=main)
+![Maven Central](https://img.shields.io/maven-central/v/com.ringcentral/cassandra4io_2.13)
 
 This is lightweight cats-effect and fs2 IO wrapper for latest datastax 4.x driver.
 
@@ -21,7 +22,7 @@ Cassandra4io is currently available for Scala 2.13 and 2.12.
 
 ### Add a dependency to your project
 ```scala
-libraryDependencies += ("com.ringcentral" %% "cassandra4io" % "0.1.13")
+libraryDependencies += ("com.ringcentral" %% "cassandra4io" % "0.1.14")
 ```
 
 ### Create a connection to Cassandra
