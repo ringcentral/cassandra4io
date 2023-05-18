@@ -33,9 +33,9 @@ lazy val root = (project in file("."))
       "com.chuusai"         %% "shapeless"                      % "2.3.8"
     ) ++ Seq(
       "com.disneystreaming" %% "weaver-cats"                    % "0.7.10"  % "it,test",
-      "org.testcontainers"   % "testcontainers"                 % "1.16.3" % "it",
-      "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.40.2" % "it",
-      "ch.qos.logback"       % "logback-classic"                % "1.2.11" % "it,test"
+      "org.testcontainers"   % "testcontainers"                 % "1.16.3"  % "it",
+      "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.40.15" % "it",
+      "ch.qos.logback"       % "logback-classic"                % "1.2.11"  % "it,test"
     ) ++ (scalaBinaryVersion.value match {
       case v if v.startsWith("2.13") =>
         Seq.empty
