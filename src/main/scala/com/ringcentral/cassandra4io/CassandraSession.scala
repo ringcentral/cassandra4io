@@ -7,11 +7,9 @@ import com.datastax.oss.driver.api.core.cql._
 import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.ringcentral.cassandra4io.utils.JavaConcurrentToCats.fromJavaAsync
 import fs2.{ Chunk, Pull, Stream }
-import simulacrum.typeclass
 
 import scala.jdk.CollectionConverters._
 
-@typeclass
 trait CassandraSession[F[_]] {
   def prepare(stmt: String): F[PreparedStatement]
   def execute(stmt: Statement[_]): F[AsyncResultSet]

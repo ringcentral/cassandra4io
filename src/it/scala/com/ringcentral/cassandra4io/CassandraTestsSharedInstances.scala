@@ -2,6 +2,7 @@ package com.ringcentral.cassandra4io
 
 import cats.effect.{ IO, Resource }
 import cats.implicits.catsSyntaxApplicative
+import cats.syntax.applicative._
 import cats.syntax.foldable._
 import com.datastax.oss.driver.api.core.cql.SimpleStatement
 import com.datastax.oss.driver.api.core.{ CqlSession, CqlSessionBuilder }
