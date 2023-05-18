@@ -41,7 +41,7 @@ lazy val root = (project in file("."))
         Seq.empty
 
       case v if v.startsWith("2.12") =>
-        Seq("org.scala-lang.modules" %% "scala-collection-compat" % "2.6.0")
+        Seq("org.scala-lang.modules" %% "scala-collection-compat" % "2.10.0")
 
       case other                     =>
         sys.error(s"Unsupported scala version: $other")
