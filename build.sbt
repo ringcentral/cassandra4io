@@ -6,7 +6,7 @@ inThisBuild(
     organizationName := "ringcentral",
     licenses := List("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0")),
     scalaVersion := crossScalaVersions.value.head,
-    crossScalaVersions := Seq("2.13.10", "2.12.17"),
+    crossScalaVersions := Seq("2.13.11", "2.12.17"),
     licenses := Seq(("Apache-2.0", url("https://opensource.org/licenses/Apache-2.0"))),
     homepage := Some(url("https://github.com/ringcentral/cassandra4io")),
     developers := List(
