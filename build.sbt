@@ -29,7 +29,7 @@ lazy val root = (project in file("."))
     libraryDependencies ++= Seq(
       "org.typelevel"       %% "cats-effect"                    % "3.5.0",
       "co.fs2"              %% "fs2-core"                       % "3.9.2",
-      "com.datastax.oss"     % "java-driver-core"               % "4.15.0",
+      "com.datastax.oss"     % "java-driver-core"               % "4.17.0",
       "com.chuusai"         %% "shapeless"                      % "2.3.10"
     ) ++ Seq(
       "com.disneystreaming" %% "weaver-cats"                    % "0.8.3"   % "it,test",
