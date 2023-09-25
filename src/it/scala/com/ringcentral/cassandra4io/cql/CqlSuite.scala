@@ -7,7 +7,7 @@ import com.ringcentral.cassandra4io.CassandraTestsSharedInstances
 import fs2.Stream
 import weaver._
 
-import java.time.{Duration, LocalDate, LocalTime}
+import java.time.{ Duration, LocalDate, LocalTime }
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -393,7 +393,7 @@ trait CqlSuite {
   }
 
   test("nullable field should be correctly encoded in inserts") { session =>
-    val id = 5L
+    val id                   = 5L
     val data: Option[String] = None
     for {
       result <- cql"insert into cassandra4io.test_data (id, data) values ($id, $data)".execute(session).attempt
@@ -402,7 +402,7 @@ trait CqlSuite {
 
   test("nullable fields should be correctly set with 'usingUnset'") { session =>
     case class TestData(id: Long, data: Option[String], count: Option[Int])
-    val id = 111L
+    val id    = 111L
     val data1 = TestData(id, Some("test"), Some(15))
     val data2 = TestData(id, None, None)
 
@@ -411,20 +411,20 @@ trait CqlSuite {
     for {
       insertResult1 <-
         cql"insert into cassandra4io.test_data (id, data, count) values (${data1.id}, ${data1.data}, ${data1.count})"
-          .execute(session).attempt
+          .execute(session)
+          .attempt
       selectResult1 <-
         cql"select id, data, count from cassandra4io.test_data where id = $id".as[TestData].selectFirst(session)
       insertResult2 <-
         cql"insert into cassandra4io.test_data (id, data, count) values (${data2.id}, ${data2.data}, ${data2.count.usingUnset})"
-        .execute(session).attempt
+          .execute(session)
+          .attempt
       selectResult2 <-
         cql"select id, data, count from cassandra4io.test_data where id = $id".as[TestData].selectFirst(session)
-    } yield {
-      expect(insertResult1.contains(true)) &&
-        expect(insertResult2.contains(true)) &&
-        expect(selectResult1.contains(data1)) &&
-        expect(selectResult2.contains(data2.copy(count = data1.count)))
-    }
+    } yield expect(insertResult1.contains(true)) &&
+      expect(insertResult2.contains(true)) &&
+      expect(selectResult1.contains(data1)) &&
+      expect(selectResult2.contains(data2.copy(count = data1.count)))
   }
 
   // handle NULL values for udt columns

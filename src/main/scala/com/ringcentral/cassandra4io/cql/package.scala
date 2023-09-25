@@ -317,7 +317,7 @@ package object cql {
     ): Binder[Option[T]] = new Binder[Option[T]] {
       override def bind(statement: BoundStatement, index: Int, value: Option[T]): (BoundStatement, Int) = value match {
         case Some(x) => Binder[T].bind(statement, index, x)
-        case None => (bindNone(statement, index), index + 1)
+        case None    => (bindNone(statement, index), index + 1)
       }
     }
 
