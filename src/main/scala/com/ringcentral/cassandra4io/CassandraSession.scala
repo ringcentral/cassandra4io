@@ -42,7 +42,7 @@ object CassandraSession {
         Pull
           .eval(current)
           .flatMap { rs =>
-            val chunk = Chunk.iterable(rs.currentPage().asScala)
+            val chunk = Chunk.from(rs.currentPage().asScala)
 
             if (rs.hasMorePages)
               Pull.output(chunk) >> go(fromJavaAsync(rs.fetchNextPage()))
