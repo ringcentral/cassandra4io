@@ -32,9 +32,9 @@ lazy val root = (project in file("."))
       "com.datastax.oss"     % "java-driver-core"               % "4.17.0",
       "com.chuusai"         %% "shapeless"                      % "2.3.10"
     ) ++ Seq(
-      "com.disneystreaming" %% "weaver-cats"                    % "0.8.3"   % "it,test",
+      "com.disneystreaming" %% "weaver-cats"                    % "0.8.3"  % "it,test",
       "org.testcontainers"   % "testcontainers"                 % "1.19.1"  % "it",
-      "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.40.17" % "it",
+      "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.41.0" % "it",
       "ch.qos.logback"       % "logback-classic"                % "1.4.11"  % "it,test"
     ) ++ (scalaBinaryVersion.value match {
       case v if v.startsWith("2.13") =>
