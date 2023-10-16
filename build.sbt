@@ -27,15 +27,15 @@ lazy val root = (project in file("."))
     Defaults.itSettings,
     IntegrationTest / fork := true,
     libraryDependencies ++= Seq(
-      "org.typelevel"       %% "cats-effect"                    % "3.5.1",
+      "org.typelevel"       %% "cats-effect"                    % "3.5.2",
       "co.fs2"              %% "fs2-core"                       % "3.9.2",
       "com.datastax.oss"     % "java-driver-core"               % "4.17.0",
       "com.chuusai"         %% "shapeless"                      % "2.3.10"
     ) ++ Seq(
       "com.disneystreaming" %% "weaver-cats"                    % "0.8.3"  % "it,test",
-      "org.testcontainers"   % "testcontainers"                 % "1.18.3" % "it",
+      "org.testcontainers"   % "testcontainers"                 % "1.19.1"  % "it",
       "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.41.0" % "it",
-      "ch.qos.logback"       % "logback-classic"                % "1.4.11" % "it,test"
+      "ch.qos.logback"       % "logback-classic"                % "1.4.11"  % "it,test"
     ) ++ (scalaBinaryVersion.value match {
       case v if v.startsWith("2.13") =>
         Seq.empty
