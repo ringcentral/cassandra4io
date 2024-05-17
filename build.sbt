@@ -30,7 +30,7 @@ lazy val root = (project in file("."))
       "org.typelevel"       %% "cats-effect"                    % "3.5.2",
       "co.fs2"              %% "fs2-core"                       % "3.9.2",
       "com.datastax.oss"     % "java-driver-core"               % "4.17.0",
-      "com.chuusai"         %% "shapeless"                      % "2.3.10"
+      "com.chuusai"         %% "shapeless"                      % "2.3.11"
     ) ++ Seq(
       "com.disneystreaming" %% "weaver-cats"                    % "0.8.3"  % "it,test",
       "org.testcontainers"   % "testcontainers"                 % "1.19.1"  % "it",
