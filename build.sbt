@@ -22,7 +22,7 @@ lazy val root = (project in file("."))
     ) ++ Seq(
       "com.disneystreaming" %% "weaver-framework"               % "0.5.1"  % "it,test",
       "org.testcontainers"   % "testcontainers"                 % "1.15.1" % "it",
-      "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.38.6" % "it"
+      "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.38.9" % "it"
     )
   )
 
