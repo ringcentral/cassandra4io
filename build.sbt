@@ -20,7 +20,7 @@ lazy val root = (project in file("."))
       "com.datastax.oss"     % "java-driver-core"               % "4.9.0",
       "com.chuusai"         %% "shapeless"                      % "2.3.3"
     ) ++ Seq(
-      "com.disneystreaming" %% "weaver-framework"               % "0.5.1"  % "it,test",
+      "com.disneystreaming" %% "weaver-framework"               % "0.8.4"  % "it,test",
       "org.testcontainers"   % "testcontainers"                 % "1.15.1" % "it",
       "com.dimafeng"        %% "testcontainers-scala-cassandra" % "0.38.6" % "it"
     )
