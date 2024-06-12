@@ -16,7 +16,7 @@ lazy val root = (project in file("."))
     Defaults.itSettings,
     libraryDependencies ++= Seq(
       "org.typelevel"       %% "cats-effect"                    % "2.3.1",
-      "co.fs2"              %% "fs2-core"                       % "2.5.0",
+      "co.fs2"              %% "fs2-core"                       % "2.5.12",
       "com.datastax.oss"     % "java-driver-core"               % "4.9.0",
       "com.chuusai"         %% "shapeless"                      % "2.3.3"
     ) ++ Seq(
