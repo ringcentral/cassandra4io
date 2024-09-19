@@ -88,6 +88,19 @@ trait CqlSuite {
     } yield expect(results == Seq("one", "two", "three"))
   }
 
+  test("interpolated select template should return data from migration if table name is a constant parameter") {
+    session =>
+      val tableName = "cassandra4io.test_data"
+      for {
+        prepared <- cqlt"select data FROM ${Const(tableName)} WHERE id in ${Put[List[Long]]}"
+                      .as[String]
+                      .config(_.setTimeout(Duration.ofSeconds(1)))
+                      .prepare(session)
+        query     = prepared(List[Long](1, 2, 3))
+        results  <- query.select.compile.toList
+      } yield expect(results == Seq("one", "two", "three"))
+  }
+
   test("interpolated select template should return tuples from migration") { session =>
     for {
       prepared <- cqlt"select id, data, dataset FROM cassandra4io.test_data WHERE id in ${Put[List[Long]]}"

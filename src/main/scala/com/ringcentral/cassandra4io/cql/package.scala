@@ -7,7 +7,6 @@ import cats.{ Functor, Monad }
 import com.datastax.oss.driver.api.core.`type`.UserDefinedType
 import com.datastax.oss.driver.api.core.cql._
 import com.datastax.oss.driver.api.core.data.UdtValue
-import com.datastax.oss.driver.internal.core.`type`.{ DefaultListType, DefaultMapType, DefaultSetType }
 import fs2.Stream
 import shapeless._
 import shapeless.ops.hlist.Prepend
@@ -16,7 +15,6 @@ import java.nio.ByteBuffer
 import java.time.{ Instant, LocalDate }
 import java.util.UUID
 import scala.annotation.{ implicitNotFound, tailrec }
-import scala.jdk.CollectionConverters._
 
 package object cql {
 
@@ -124,7 +122,17 @@ package object cql {
       bb: BindableBuilder.Aux[P, V]
     ): QueryTemplate[V, Row] = {
       implicit val binder: Binder[V] = bb.binder
-      QueryTemplate[V, Row](ctx.parts.mkString("?"), identity)
+      QueryTemplate[V, Row](
+        ctx.parts
+          .foldLeft[(HList, StringBuilder)]((params, new StringBuilder())) {
+            case ((Const(const) :: tail, builder), part) => (tail, builder.addAll(part).addAll(const))
+            case ((_ :: tail, builder), part)            => (tail, builder.addAll(part).addAll("?"))
+            case ((HNil, builder), part)                 => (HNil, builder.addAll(part))
+          }
+          ._2
+          .toString(),
+        identity
+      )
     }
   }
 
@@ -142,7 +150,7 @@ package object cql {
         override type Repr = HNil
         override def binder: Binder[HNil] = Binder[HNil]
       }
-      implicit def hConsBindableBuilder[PH <: Put[_], T: Binder, PT <: HList, RT <: HList](implicit
+      implicit def hConsBindableBuilder[T: Binder, PT <: HList, RT <: HList](implicit
         f: BindableBuilder.Aux[PT, RT]
       ): BindableBuilder.Aux[Put[T] :: PT, T :: RT]                                            = new BindableBuilder[Put[T] :: PT] {
         override type Repr = T :: RT
@@ -151,6 +159,13 @@ package object cql {
           Binder[T :: RT]
         }
       }
+      implicit def hConsBindableConstBuilder[PT <: HList, RT <: HList](implicit
+        f: BindableBuilder.Aux[PT, RT]
+      ): BindableBuilder.Aux[Const :: PT, RT]                                                  =
+        new BindableBuilder[Const :: PT] {
+          override type Repr = RT
+          override def binder: Binder[RT] = f.binder
+        }
     }
   }
 
@@ -244,6 +259,8 @@ package object cql {
   object Put {
     def apply[T: Binder]: Put[T] = new Put[T] {}
   }
+
+  case class Const(fragment: String)
 
   object Binder extends BinderLowerPriority with BinderLowestPriority {
 
