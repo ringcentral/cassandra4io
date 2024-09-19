@@ -121,8 +121,12 @@ trait ReadsLowestPriority {
   implicit def caseClassParser[A, R <: HList](implicit
     gen: Generic[A] { type Repr = R },
     reprParser: Reads[R]
-  ): Reads[A] = (row: Row, index: Int) => {
-    val rep = reprParser.read(row, index)
-    gen.from(rep)
-  }
+  ): Reads[A] =
+    new Reads[A] {
+      override def readNullable(row: Row, index: Int): A = {
+        val rep = reprParser.read(row, index)
+        gen.from(rep)
+      }
+      override def read(row: Row, index: Int): A = readNullable(row, index)
+    }
 }

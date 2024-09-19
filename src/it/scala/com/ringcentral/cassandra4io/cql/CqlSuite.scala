@@ -386,6 +386,13 @@ trait CqlSuite {
     } yield expect(row.isDefined && row.get.data.isEmpty)
   }
 
+  test("decoding from null should return None for optional case class first parameter") { session =>
+    case class OptDataReverse(data: Option[String], id: Long)
+    for {
+      row <- cql"select data, id FROM cassandra4io.test_data WHERE id = 0".as[OptDataReverse].selectFirst(session)
+    } yield expect(row.isDefined && row.get.data.isEmpty)
+  }
+
   test("decoding from null should raise error String field in case class") { session =>
     for {
       result <- cql"select id, data FROM cassandra4io.test_data WHERE id = 0".as[Data].selectFirst(session).attempt
