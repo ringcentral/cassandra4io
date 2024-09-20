@@ -100,9 +100,10 @@ trait Dao[F[_]] {
     
 object Dao {
   
-  private val insertQuery = cqlt"insert into table (id, data) values (${Put[Int]}, ${Put[String]})"
+  private val tableName = "table"
+  private val insertQuery = cqlt"insert into ${Const(tableName)} (id, data) values (${Put[Int]}, ${Put[String]})"
     .config(_.setTimeout(1.second.toJava))
-  private val selectQuery = cqlt"select id, data from table where id = ${Put[Int]}".as[Model]
+  private val selectQuery = cqlt"select id, data from ${Const(tableName)} where id = ${Put[Int]}".as[Model]
 
   def apply[F[_]: Async](session: CassandraSession[F]) = for {
     insert <- insertQuery.prepare(session)
