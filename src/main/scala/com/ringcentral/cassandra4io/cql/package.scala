@@ -125,9 +125,9 @@ package object cql {
       QueryTemplate[V, Row](
         ctx.parts
           .foldLeft[(HList, StringBuilder)]((params, new StringBuilder())) {
-            case ((Const(const) :: tail, builder), part) => (tail, builder.addAll(part).addAll(const))
-            case ((_ :: tail, builder), part)            => (tail, builder.addAll(part).addAll("?"))
-            case ((HNil, builder), part)                 => (HNil, builder.addAll(part))
+            case ((Const(const) :: tail, builder), part) => (tail, builder.appendAll(part).appendAll(const))
+            case ((_ :: tail, builder), part)            => (tail, builder.appendAll(part).appendAll("?"))
+            case ((HNil, builder), part)                 => (HNil, builder.appendAll(part))
           }
           ._2
           .toString(),
