@@ -35,6 +35,7 @@ object Reads extends ReadsLowerPriority with ReadsLowestPriority {
 
   implicit val stringReads: Reads[String]         = (row: Row, index: Int) => row.getString(index)
   implicit val doubleReads: Reads[Double]         = (row: Row, index: Int) => row.getDouble(index)
+  implicit val floatReads: Reads[Float]           = (row: Row, index: Int) => row.getFloat(index)
   implicit val intReads: Reads[Int]               = (row: Row, index: Int) => row.getInt(index)
   implicit val longReads: Reads[Long]             = (row: Row, index: Int) => row.getLong(index)
   implicit val byteBufferReads: Reads[ByteBuffer] = (row: Row, index: Int) => row.getByteBuffer(index)

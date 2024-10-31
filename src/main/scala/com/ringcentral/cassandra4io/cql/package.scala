@@ -276,6 +276,11 @@ package object cql {
         (statement.setDouble(index, value), index + 1)
     }
 
+    implicit val floatBinder: Binder[Float] = new Binder[Float] {
+      override def bind(statement: BoundStatement, index: Int, value: Float): (BoundStatement, Int) =
+        (statement.setFloat(index, value), index + 1)
+    }
+
     implicit val intBinder: Binder[Int] = new Binder[Int] {
       override def bind(statement: BoundStatement, index: Int, value: Int): (BoundStatement, Int) =
         (statement.setInt(index, value), index + 1)
