@@ -7,7 +7,7 @@ import com.ringcentral.cassandra4io.CassandraTestsSharedInstances
 import fs2.Stream
 import weaver._
 
-import java.time.{ Duration, LocalDate, LocalTime }
+import java.time.{Duration, LocalDate, LocalTime}
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -192,6 +192,30 @@ trait CqlSuite {
     for {
       results <- getIds(List(1, 2, 3)).select(session).compile.toList
     } yield expect(results == Seq(Data(1, "one"), Data(2, "two"), Data(3, "three")))
+  }
+
+  test(
+    "interpolated inserts and selects should work with derived Columns and Values"
+  ) { session =>
+    case class Table(key: Long, projectionKey: String, projectionData: String, offset: Long, timestamp: Long)
+    case class Key(key: Long, projectionKey: String)
+
+    val insert = cqlt"INSERT INTO ${Const("test_data_interpolated")}(${Columns[Table]}) VALUES (${Values[Table]})"
+    val select =
+      cqlt"SELECT ${Columns[Table]} FROM ${Const("test_data_interpolated")} WHERE ${PrimaryKey[Key]}"
+        .as[Table]
+
+    val data1 = Table(1, "projection-1", "data-1", 1, 1732547921580L)
+    val data2 = Table(1, "projection-2", "data-1", 2, 1732547921586L)
+    val key   = Key(1, "projection-1")
+
+    for {
+      preparedInsert <- insert.prepare(session)
+      preparedSelect <- select.prepare(session)
+      _              <- preparedInsert(data1).execute
+      _              <- preparedInsert(data2).execute
+      result         <- preparedSelect(key).select.compile.toList
+    } yield expect(result == List(data1))
   }
 
   test(

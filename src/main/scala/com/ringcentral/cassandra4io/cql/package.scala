@@ -9,6 +9,7 @@ import com.datastax.oss.driver.api.core.cql._
 import com.datastax.oss.driver.api.core.data.UdtValue
 import fs2.Stream
 import shapeless._
+import shapeless.labelled.FieldType
 import shapeless.ops.hlist.Prepend
 
 import java.nio.ByteBuffer
@@ -125,9 +126,15 @@ package object cql {
       QueryTemplate[V, Row](
         ctx.parts
           .foldLeft[(HList, StringBuilder)]((params, new StringBuilder())) {
-            case ((Const(const) :: tail, builder), part) => (tail, builder.appendAll(part).appendAll(const))
-            case ((_ :: tail, builder), part)            => (tail, builder.appendAll(part).appendAll("?"))
-            case ((HNil, builder), part)                 => (HNil, builder.appendAll(part))
+            case ((Const(const) :: tail, builder), part)          => (tail, builder.appendAll(part).appendAll(const))
+            case (((ands: PrimaryKey[_]) :: tail, builder), part) =>
+              (tail, builder.appendAll(part).appendAll(ands.keys.map(key => s"${key} = ?").mkString(" AND ")))
+            case (((columns: Columns[_]) :: tail, builder), part) =>
+              (tail, builder.appendAll(part).appendAll(columns.keys.mkString(", ")))
+            case (((values: Values[_]) :: tail, builder), part)   =>
+              (tail, builder.appendAll(part).appendAll(List.fill(values.size)("?").mkString(", ")))
+            case ((_ :: tail, builder), part)                     => (tail, builder.appendAll(part).appendAll("?"))
+            case ((HNil, builder), part)                          => (HNil, builder.appendAll(part))
           }
           ._2
           .toString(),
@@ -166,6 +173,36 @@ package object cql {
           override type Repr = RT
           override def binder: Binder[RT] = f.binder
         }
+
+      implicit def hConsBindableColumnsBuilder[T, PT <: HList, RT <: HList](implicit
+        f: BindableBuilder.Aux[PT, RT]
+      ): BindableBuilder.Aux[Columns[T] :: PT, RT] =
+        new BindableBuilder[Columns[T] :: PT] {
+          override type Repr = RT
+          override def binder: Binder[RT] = f.binder
+        }
+
+      implicit def hConsBindableValuesBuilder[T: ColumnsValues, PT <: HList, RT <: HList](implicit
+        f: BindableBuilder.Aux[PT, RT]
+      ): BindableBuilder.Aux[Values[T] :: PT, T :: RT] = new BindableBuilder[Values[T] :: PT] {
+        override type Repr = T :: RT
+        override def binder: Binder[T :: RT] = {
+          implicit val hBinder: Binder[T]  = Values[T].binder
+          implicit val tBinder: Binder[RT] = f.binder
+          Binder[T :: RT]
+        }
+      }
+
+      implicit def hConsBindableAndsBuilder[T: ColumnsValues, PT <: HList, RT <: HList](implicit
+        f: BindableBuilder.Aux[PT, RT]
+      ): BindableBuilder.Aux[PrimaryKey[T] :: PT, T :: RT] = new BindableBuilder[PrimaryKey[T] :: PT] {
+        override type Repr = T :: RT
+        override def binder: Binder[T :: RT] = {
+          implicit val hBinder: Binder[T]  = Values[T].binder
+          implicit val tBinder: Binder[RT] = f.binder
+          Binder[T :: RT]
+        }
+      }
     }
   }
 
@@ -261,6 +298,78 @@ package object cql {
   }
 
   case class Const(fragment: String)
+  trait Columns[T]  {
+    def keys: List[String]
+  }
+  object Columns    {
+    def apply[T: ColumnsValues]: Columns[T] = new Columns[T] {
+      override def keys: List[String] = ColumnsValues[T].keys
+    }
+  }
+  trait Values[T]   {
+    def size: Int
+    def binder: Binder[T]
+  }
+  object Values     {
+    def apply[T: ColumnsValues]: Values[T] = new Values[T] {
+      override def size: Int         = ColumnsValues[T].size
+      override def binder: Binder[T] = ColumnsValues[T].binder
+    }
+  }
+  trait PrimaryKey[T] extends Columns[T] with Values[T]
+  object PrimaryKey {
+    def apply[T: ColumnsValues]: PrimaryKey[T] = new PrimaryKey[T] {
+      override def keys: List[String] = ColumnsValues[T].keys
+      override def size: Int          = ColumnsValues[T].size
+      override def binder: Binder[T]  = ColumnsValues[T].binder
+    }
+  }
+
+  trait ColumnsValues[T] extends Columns[T] with Values[T]
+  object ColumnsValues {
+    def apply[T](implicit ev: ColumnsValues[T]): ColumnsValues[T] = ev
+
+    implicit val hNilColumnsValues: ColumnsValues[HNil] = new ColumnsValues[HNil] {
+      override def keys: List[String]   = List.empty
+      override def size: Int            = 0
+      override def binder: Binder[HNil] = Binder.hNilBinder
+    }
+
+    implicit def hListColumnsValues[K, V, T <: HList](implicit
+      witness: Witness.Aux[K],
+      tColumnsValues: ColumnsValues[T],
+      vBinder: Binder[V]
+    ): ColumnsValues[FieldType[K, V] :: T] =
+      new ColumnsValues[FieldType[K, V] :: T] {
+        override def keys: List[String] = {
+          val key = witness.value match {
+            case Symbol(key) => key
+            case _           => witness.value.toString
+          }
+          key :: tColumnsValues.keys
+        }
+        override def size: Int = tColumnsValues.size + 1
+        override def binder: Binder[FieldType[K, V] :: T] = {
+          implicit val hBinder: Binder[FieldType[K, V]] = new Binder[FieldType[K, V]] {
+            override def bind(statement: BoundStatement, index: Int, value: FieldType[K, V]): (BoundStatement, Int) =
+              vBinder.bind(statement, index, value)
+          }
+          implicit val tBinder: Binder[T]               = tColumnsValues.binder
+          Binder[FieldType[K, V] :: T]
+        }
+      }
+    implicit def genColumnValues[T, TRepr](implicit
+      gen: LabelledGeneric.Aux[T, TRepr],
+      columnsValues: ColumnsValues[TRepr]
+    ): ColumnsValues[T]                    = new ColumnsValues[T] {
+      override def keys: List[String] = columnsValues.keys
+      override def size: Int          = columnsValues.size
+      override def binder: Binder[T]  = new Binder[T] {
+        override def bind(statement: BoundStatement, index: Int, value: T): (BoundStatement, Int) =
+          columnsValues.binder.bind(statement, index, gen.to(value))
+      }
+    }
+  }
 
   object Binder extends BinderLowerPriority with BinderLowestPriority {
 
