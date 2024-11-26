@@ -202,7 +202,7 @@ trait CqlSuite {
 
     val insert = cqlt"INSERT INTO ${Const("test_data_interpolated")}(${Columns[Table]}) VALUES (${Values[Table]})"
     val select =
-      cqlt"SELECT ${Columns[Table]} FROM ${Const("test_data_interpolated")} WHERE ${KeyEquals[Key]}"
+      cqlt"SELECT ${Columns[Table]} FROM ${Const("test_data_interpolated")} WHERE ${KeyEqualsTo[Key]}"
         .as[Table]
 
     val data1 = Table(1, "projection-1", "data-1", 1, 1732547921580L)
@@ -224,9 +224,9 @@ trait CqlSuite {
     case class Data(projectionData: String, offset: Long, timestamp: Long)
     case class Key(key: Long, projectionKey: String)
 
-    val update = cqlt"UPDATE ${Const("test_data_interpolated")} SET ${Assignment[Data]} WHERE ${KeyEquals[Key]}"
+    val update = cqlt"UPDATE ${Const("test_data_interpolated")} SET ${Assignment[Data]} WHERE ${KeyEqualsTo[Key]}"
     val select =
-      cqlt"SELECT ${Columns[Data]} FROM ${Const("test_data_interpolated")} WHERE ${KeyEquals[Key]}"
+      cqlt"SELECT ${Columns[Data]} FROM ${Const("test_data_interpolated")} WHERE ${KeyEqualsTo[Key]}"
         .as[Data]
 
     val data1 = Data("data-1", 1, 1732547921580L)

@@ -127,7 +127,7 @@ package object cql {
         ctx.parts
           .foldLeft[(HList, StringBuilder)]((params, new StringBuilder())) {
             case ((Const(const) :: tail, builder), part)                => (tail, builder.appendAll(part).appendAll(const))
-            case (((restriction: KeyEquals[_]) :: tail, builder), part) =>
+            case (((restriction: KeyEqualsTo[_]) :: tail, builder), part) =>
               (tail, builder.appendAll(part).appendAll(restriction.keys.map(key => s"${key} = ?").mkString(" AND ")))
             case (((assignment: Assignment[_]) :: tail, builder), part) =>
               (tail, builder.appendAll(part).appendAll(assignment.keys.map(key => s"${key} = ?").mkString(", ")))
@@ -197,7 +197,7 @@ package object cql {
 
       implicit def hConsBindableRestrictionsBuilder[T: ColumnsValues, PT <: HList, RT <: HList](implicit
         f: BindableBuilder.Aux[PT, RT]
-      ): BindableBuilder.Aux[KeyEquals[T] :: PT, T :: RT] = new BindableBuilder[KeyEquals[T] :: PT] {
+      ): BindableBuilder.Aux[KeyEqualsTo[T] :: PT, T :: RT] = new BindableBuilder[KeyEqualsTo[T] :: PT] {
         override type Repr = T :: RT
         override def binder: Binder[T :: RT] = {
           implicit val hBinder: Binder[T]  = Values[T].binder
@@ -329,9 +329,9 @@ package object cql {
       override def binder: Binder[T] = ColumnsValues[T].binder
     }
   }
-  trait KeyEquals[T] extends Columns[T] with Values[T]
-  object KeyEquals {
-    def apply[T: ColumnsValues]: KeyEquals[T] = new KeyEquals[T] {
+  trait KeyEqualsTo[T] extends Columns[T] with Values[T]
+  object KeyEqualsTo {
+    def apply[T: ColumnsValues]: KeyEqualsTo[T] = new KeyEqualsTo[T] {
       override def keys: List[String] = ColumnsValues[T].keys
       override def size: Int          = ColumnsValues[T].size
       override def binder: Binder[T]  = ColumnsValues[T].binder
