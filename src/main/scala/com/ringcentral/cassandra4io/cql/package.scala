@@ -335,6 +335,12 @@ package object cql {
       override def binder: Binder[HNil] = Binder.hNilBinder
     }
 
+    private def camel2snake(text: String) =
+      text.tail.foldLeft(text.headOption.fold("")(_.toLower.toString)) {
+        case (acc, c) if c.isUpper => acc + "_" + c.toLower
+        case (acc, c)              => acc + c
+      }
+
     implicit def hListColumnsValues[K, V, T <: HList](implicit
       witness: Witness.Aux[K],
       tColumnsValues: ColumnsValues[T],
@@ -343,7 +349,7 @@ package object cql {
       new ColumnsValues[FieldType[K, V] :: T] {
         override def keys: List[String] = {
           val key = witness.value match {
-            case Symbol(key) => key
+            case Symbol(key) => camel2snake(key)
             case _           => witness.value.toString
           }
           key :: tColumnsValues.keys
