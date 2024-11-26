@@ -195,14 +195,14 @@ trait CqlSuite {
   }
 
   test(
-    "interpolated inserts and selects should work with derived Columns and Values"
+    "interpolated inserts and selects should work with derived KeyEquals, Columns and Values"
   ) { session =>
     case class Table(key: Long, projectionKey: String, projectionData: String, offset: Long, timestamp: Long)
     case class Key(key: Long, projectionKey: String)
 
     val insert = cqlt"INSERT INTO ${Const("test_data_interpolated")}(${Columns[Table]}) VALUES (${Values[Table]})"
     val select =
-      cqlt"SELECT ${Columns[Table]} FROM ${Const("test_data_interpolated")} WHERE ${PrimaryKey[Key]}"
+      cqlt"SELECT ${Columns[Table]} FROM ${Const("test_data_interpolated")} WHERE ${KeyEquals[Key]}"
         .as[Table]
 
     val data1 = Table(1, "projection-1", "data-1", 1, 1732547921580L)
@@ -215,6 +215,31 @@ trait CqlSuite {
       _              <- preparedInsert(data1).execute
       _              <- preparedInsert(data2).execute
       result         <- preparedSelect(key).select.compile.toList
+    } yield expect(result == List(data1))
+  }
+
+  test(
+    "interpolated updates and selects should work with derived KeyEquals and Assignment"
+  ) { session =>
+    case class Data(projectionData: String, offset: Long, timestamp: Long)
+    case class Key(key: Long, projectionKey: String)
+
+    val update = cqlt"UPDATE ${Const("test_data_interpolated")} SET ${Assignment[Data]} WHERE ${KeyEquals[Key]}"
+    val select =
+      cqlt"SELECT ${Columns[Data]} FROM ${Const("test_data_interpolated")} WHERE ${KeyEquals[Key]}"
+        .as[Data]
+
+    val data1 = Data("data-1", 1, 1732547921580L)
+    val data2 = Data("data-1", 2, 1732547921586L)
+    val key1  = Key(2, "projection-1")
+    val key2  = Key(2, "projection-2")
+
+    for {
+      preparedUpdate <- update.prepare(session)
+      preparedSelect <- select.prepare(session)
+      _              <- preparedUpdate(data1, key1).execute
+      _              <- preparedUpdate(data2, key2).execute
+      result         <- preparedSelect(key1).select.compile.toList
     } yield expect(result == List(data1))
   }
 
