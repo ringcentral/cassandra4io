@@ -125,7 +125,7 @@ object Dao {
       value.metaData
     ).execute.void // updateAlternative(value).execute.void
     override def update(key: Key, data: Data): F[Unit] = updateQuery(data, key).execute.void
-    override def get(key: Key) = select(id).config(_.setExecutionProfileName("default")).select.head.compile.last
+    override def get(key: Key) = select(key).config(_.setExecutionProfileName("default")).select.head.compile.last
   }
 }
 ```
