@@ -129,7 +129,7 @@ object Dao {
   }
 }
 ```
-As you can see `${Columns[Model]}` expands to `pk, ck, data, meta_data`, `${Values[Model]}` to `?, ?, ?, ?`, `${Assignment[Data]}` to `pk = ?, ck = ?, data = ?, meta_data = ?` and `${EqualsTo[Key]}` expands to `pk = ? and ck = ? and data = ? and meta_data = ?`.
+As you can see `${Columns[Model]}` expands to `pk, ck, data, meta_data`, `${Values[Model]}` to `?, ?, ?, ?`, `${Assignment[Data]}` to `data = ?, meta_data = ?` and `${EqualsTo[Key]}` expands to `pk = ? and ck = ?`.
 Latter three types adjust query type as well for being able to bind corresponding values 
 
 ### Handling optional fields (`null`)
