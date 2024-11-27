@@ -90,30 +90,47 @@ import scala.jdk.DurationConverters._
 import com.datastax.oss.driver.api.core.ConsistencyLevel
 import com.ringcentral.cassandra4io.CassandraSession
 import com.ringcentral.cassandra4io.cql._
-    
-case class Model(id: Int, data: String)
-  
+
+case class Model(pk: Long, ck: String, data: String, metaData: String)
+case class Key(pk: Long, ck: String)
+case class Data(data: String, metaData: String)
+
 trait Dao[F[_]] {
   def put(value: Model): F[Unit]
-  def get(id: Int): F[Option[Model]]
+  def update(key: Key, data: Data): F[Unit]
+  def get(key: Key): F[Option[Model]]
 }
-    
-object Dao {
-  
-  private val tableName = "table"
-  private val insertQuery = cqlt"insert into ${Const(tableName)} (id, data) values (${Put[Int]}, ${Put[String]})"
-    .config(_.setTimeout(1.second.toJava))
-  private val selectQuery = cqlt"select id, data from ${Const(tableName)} where id = ${Put[Int]}".as[Model]
 
-  def apply[F[_]: Async](session: CassandraSession[F]) = for {
+object Dao {
+
+  private val tableName = "table"
+  private val insertQuery =
+    cqlt"insert into ${Const(tableName)} (pk, ck, data, meta_data) values (${Put[Long]}, ${Put[String]}, ${Put[String]}, ${Put[String]})"
+      .config(_.setTimeout(1.second.toJava))
+  private val insertQueryAlternative =
+    cqlt"insert into ${Const(tableName)} (${Columns[Model]}) values (${Values[Model]})"
+  private val updateQuery = cqlt"update ${Const(tableName)} set ${Assignment[Data]} where ${EqualsTo[Key]}"
+  private val selectQuery = cqlt"select ${Columns[Model]} from ${Const(tableName)} where ${EqualsTo[Key]}".as[Model]
+
+  def apply[F[_] : Async](session: CassandraSession[F]) = for {
     insert <- insertQuery.prepare(session)
-    select <- selectQuery.prepare(session)      
+    update <- updateQuery.prepare(session)
+    updateAlternative <- insertQueryAlternative.prepare(session)
+    select <- selectQuery.prepare(session)
   } yield new Dao[F] {
-    override def put(value: Model) = insert(value.id, value.data).execute.void
-    override def get(id: Int) = select(id).config(_.setExecutionProfileName("default")).select.head.compile.last
-  } 
-} 
+    override def put(value: Model) = insert(
+      value.pk,
+      value.ck,
+      value.data,
+      value.metaData
+    ).execute.void // updateAlternative(value).execute.void
+    override def update(key: Key, data: Data): F[Unit] = updateQuery(data, key).execute.void
+    override def get(key: Key) = select(id).config(_.setExecutionProfileName("default")).select.head.compile.last
+  }
+}
 ```
+As you can see `${Columns[Model]}` expands to `pk, ck, data, meta_data`, `${Values[Model]}` to `?, ?, ?, ?`, `${Assignment[Data]}` to `pk = ?, ck = ?, data = ?, meta_data = ?` and `${EqualsTo[Key]}` expands to `pk = ? and ck = ? and data = ? and meta_data = ?`.
+Latter three types adjust query type as well for being able to bind corresponding values 
 
 ### Handling optional fields (`null`)
 

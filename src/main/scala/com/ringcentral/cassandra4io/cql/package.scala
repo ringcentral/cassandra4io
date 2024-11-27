@@ -126,17 +126,17 @@ package object cql {
       QueryTemplate[V, Row](
         ctx.parts
           .foldLeft[(HList, StringBuilder)]((params, new StringBuilder())) {
-            case ((Const(const) :: tail, builder), part)                  => (tail, builder.appendAll(part).appendAll(const))
-            case (((restriction: KeyEqualsTo[_]) :: tail, builder), part) =>
+            case ((Const(const) :: tail, builder), part)                => (tail, builder.appendAll(part).appendAll(const))
+            case (((restriction: EqualsTo[_]) :: tail, builder), part)  =>
               (tail, builder.appendAll(part).appendAll(restriction.keys.map(key => s"${key} = ?").mkString(" AND ")))
-            case (((assignment: Assignment[_]) :: tail, builder), part)   =>
+            case (((assignment: Assignment[_]) :: tail, builder), part) =>
               (tail, builder.appendAll(part).appendAll(assignment.keys.map(key => s"${key} = ?").mkString(", ")))
-            case (((columns: Columns[_]) :: tail, builder), part)         =>
+            case (((columns: Columns[_]) :: tail, builder), part)       =>
               (tail, builder.appendAll(part).appendAll(columns.keys.mkString(", ")))
-            case (((values: Values[_]) :: tail, builder), part)           =>
+            case (((values: Values[_]) :: tail, builder), part)         =>
               (tail, builder.appendAll(part).appendAll(List.fill(values.size)("?").mkString(", ")))
-            case ((_ :: tail, builder), part)                             => (tail, builder.appendAll(part).appendAll("?"))
-            case ((HNil, builder), part)                                  => (HNil, builder.appendAll(part))
+            case ((_ :: tail, builder), part)                           => (tail, builder.appendAll(part).appendAll("?"))
+            case ((HNil, builder), part)                                => (HNil, builder.appendAll(part))
           }
           ._2
           .toString(),
@@ -289,27 +289,27 @@ package object cql {
   }
 
   case class Const(fragment: String)
-  trait Columns[T]   {
+  trait Columns[T] {
     def keys: List[String]
   }
-  object Columns     {
+  object Columns   {
     def apply[T: ColumnsValues]: Columns[T] = new Columns[T] {
       override def keys: List[String] = ColumnsValues[T].keys
     }
   }
-  trait Values[T]    {
+  trait Values[T]  {
     def size: Int
     def binder: Binder[T]
   }
-  object Values      {
+  object Values    {
     def apply[T: ColumnsValues]: Values[T] = new Values[T] {
       override def size: Int         = ColumnsValues[T].size
       override def binder: Binder[T] = ColumnsValues[T].binder
     }
   }
-  trait KeyEqualsTo[T] extends Columns[T] with Values[T]
-  object KeyEqualsTo {
-    def apply[T: ColumnsValues]: KeyEqualsTo[T] = new KeyEqualsTo[T] {
+  trait EqualsTo[T] extends Columns[T] with Values[T]
+  object EqualsTo  {
+    def apply[T: ColumnsValues]: EqualsTo[T] = new EqualsTo[T] {
       override def keys: List[String] = ColumnsValues[T].keys
       override def size: Int          = ColumnsValues[T].size
       override def binder: Binder[T]  = ColumnsValues[T].binder
