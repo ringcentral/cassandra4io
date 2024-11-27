@@ -115,7 +115,7 @@ object Dao {
   def apply[F[_] : Async](session: CassandraSession[F]) = for {
     insert <- insertQuery.prepare(session)
     update <- updateQuery.prepare(session)
-    updateAlternative <- insertQueryAlternative.prepare(session)
+    insertAlternative <- insertQueryAlternative.prepare(session)
     select <- selectQuery.prepare(session)
   } yield new Dao[F] {
     override def put(value: Model) = insert(
@@ -123,7 +123,7 @@ object Dao {
       value.ck,
       value.data,
       value.metaData
-    ).execute.void // updateAlternative(value).execute.void
+    ).execute.void // insertAlternative(value).execute.void
     override def update(key: Key, data: Data): F[Unit] = updateQuery(data, key).execute.void
     override def get(key: Key) = select(key).config(_.setExecutionProfileName("default")).select.head.compile.last
   }
