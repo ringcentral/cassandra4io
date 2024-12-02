@@ -74,3 +74,12 @@ CREATE TABLE heavily_nested_prim_table(
     data example_nested_primitive_type,
     PRIMARY KEY (id)
 );
+
+create table test_data_interpolated(
+    key bigint,
+    projection_key text,
+    projection_data text,
+    offset bigint,
+    timestamp bigint,
+    PRIMARY KEY (key, projection_key)
+);
