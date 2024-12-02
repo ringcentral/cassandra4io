@@ -326,7 +326,7 @@ package object cql {
   }
 
   trait ColumnsValues[T] extends Columns[T] with Values[T]
-  object ColumnsValues {
+  private object ColumnsValues {
     def apply[T](implicit ev: ColumnsValues[T]): ColumnsValues[T] = ev
 
     implicit val hNilColumnsValues: ColumnsValues[HNil] = new ColumnsValues[HNil] {
