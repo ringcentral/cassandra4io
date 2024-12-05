@@ -184,9 +184,31 @@ package object cql {
           override def binder: Binder[RT] = f.binder
         }
 
-      implicit def hConsBindableValuesBuilder[V[_] <: Values[_], T: ColumnsValues, PT <: HList, RT <: HList](implicit
+      implicit def hConsBindableValuesBuilder[T: ColumnsValues, PT <: HList, RT <: HList](implicit
         f: BindableBuilder.Aux[PT, RT]
-      ): BindableBuilder.Aux[V[T] :: PT, T :: RT] = new BindableBuilder[V[T] :: PT] {
+      ): BindableBuilder.Aux[Values[T] :: PT, T :: RT] = new BindableBuilder[Values[T] :: PT] {
+        override type Repr = T :: RT
+        override def binder: Binder[T :: RT] = {
+          implicit val hBinder: Binder[T]  = Values[T].binder
+          implicit val tBinder: Binder[RT] = f.binder
+          Binder[T :: RT]
+        }
+      }
+
+      implicit def hConsBindableEqualsToBuilder[T: ColumnsValues, PT <: HList, RT <: HList](implicit
+        f: BindableBuilder.Aux[PT, RT]
+      ): BindableBuilder.Aux[EqualsTo[T] :: PT, T :: RT] = new BindableBuilder[EqualsTo[T] :: PT] {
+        override type Repr = T :: RT
+        override def binder: Binder[T :: RT] = {
+          implicit val hBinder: Binder[T]  = Values[T].binder
+          implicit val tBinder: Binder[RT] = f.binder
+          Binder[T :: RT]
+        }
+      }
+
+      implicit def hConsBindableAssignmentsBuilder[T: ColumnsValues, PT <: HList, RT <: HList](implicit
+        f: BindableBuilder.Aux[PT, RT]
+      ): BindableBuilder.Aux[Assignment[T] :: PT, T :: RT] = new BindableBuilder[Assignment[T] :: PT] {
         override type Repr = T :: RT
         override def binder: Binder[T :: RT] = {
           implicit val hBinder: Binder[T]  = Values[T].binder
